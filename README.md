@@ -6,20 +6,14 @@ pasted into the text box of the window you had selected before hitting
 the bubble.
 
 ## Quick Start
-******* THIS ENTIRE SECTION IS WRONG
-```bash
-git clone https://github.com/muntzy8u/HD-2TT-nBA.git
-cd HD-2TT-nBA
-./setup.sh      # installs system deps, creates venv, downloads models
-./run.sh        # launches the bubble ******
 
-************ THE APP RUNS WITH python main.py 
-cd /home/nether/.random_queries/voice_ai/HarfDown2List
+```bash
+git clone https://github.com/muntzy8u/HarfDown2List.git
+cd HarfDown2List
 source venv/bin/activate 
 python main.py
-####thats how the live version is running atm
+'''
 
-***** 
 Requires a Linux/X11 session (see Runtime needs below — no Wayland support
 yet). Everything is free and runs locally by default.
 
@@ -170,7 +164,3 @@ Logs:    ~/.local/state/harfdown2listen/hd2l.log
   right-click menu is for.
 - The dictation path is single-language (English models by default);
   swap `PARTIAL_MODEL`/`FINAL_MODEL` for multilingual variants in config.
-# HarfDown2List
-# HarfDown2List
-# HarfDown2List
-# HarfDown2List
