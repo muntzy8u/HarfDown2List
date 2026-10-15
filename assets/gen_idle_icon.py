@@ -105,8 +105,11 @@ def compose(cap_mode="fill", use="silver", ring=False, glow=False):
         # thin accent ring just inside the outer edge (badge look)
         d = ImageDraw.Draw(r)
         d.ellipse([64, 64, W - 64, H - 64], outline=255, width=26)
-        img = np.clip(np.asarray(img, dtype=np.float32) +
-                      colorize(r, C_RING, C_RING), 0, 255).astype(np.uint8)
+        # alpha_COMPOSITE the ring layer (never add RGBA arrays: adding the
+        # ring's RGB into every pixel washed the glyph toward white)
+        base = Image.fromarray(img, "RGBA")
+        base.alpha_composite(Image.fromarray(colorize(r, C_RING, C_RING), "RGBA"))
+        img = np.asarray(base)
     png = Image.fromarray(np.clip(img, 0, 255), "RGBA")
     return png.resize((TARGET, TARGET), Image.LANCZOS)
 
@@ -122,6 +125,8 @@ VARIANTS = {
                        desc="silver with a soft halo glow"),
     "idle-mic-5": dict(cap_mode="fill", use="silver", ring=True,
                        desc="silver mic + accent badge ring"),
+    "idle-mic-6": dict(cap_mode="fill", use="accent", ring=True,
+                       desc="MIX: accent mic centre + v5 badge ring"),
 }
 
 
@@ -176,9 +181,9 @@ def main():
         p = os.path.join(ICONS, f"{name}.png")
         make_variant(name).save(p)
         print("wrote", p, "-", VARIANTS[name]["desc"])
-    # default icon file = v1 (config.BUBBLE_ICON points here)
-    make_variant("idle-mic-1").save(os.path.join(ASSETS, "idle-mic.png"))
-    print("wrote", os.path.join(ASSETS, "idle-mic.png"), "(default)")
+    # default icon file = v6 (user's pick: v3 centre + v5 ring)
+    make_variant("idle-mic-6").save(os.path.join(ASSETS, "idle-mic.png"))
+    print("wrote", os.path.join(ASSETS, "idle-mic.png"), "(default: v6 mix)")
     print("preview:", preview())
 
 
