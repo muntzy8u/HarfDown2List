@@ -1,4 +1,6 @@
 """Low-level X11 plumbing: one connection, override-redirect painted layers."""
+import math
+
 from PIL import Image, ImageDraw, ImageFont
 from Xlib import X
 from Xlib.ext import shape
@@ -216,22 +218,27 @@ class XLayer:
         self.set_input_mask(img)
 
     def set_disc_visible(self):
-        """Clip the window's VISIBLE shape to a circle (RLE 1px rows).
+        """Clip the window's VISIBLE shape to the PAINTED circle.
 
-        Without this, a square PIL canvas pastes opaque black corners even
-        though the input region is circular — the button looks like a square
-        with a circle drawn in it. Setting shape.SK.Bounding makes the window
-        itself round, so the corners are transparent/click-through.
+        Geometry is pixel-centre based and matches the paint exactly: the
+        body is a rounded-rect oval (radius = min(w,h)//2) == a circle of
+        radius min(w,h)/2 centred (w/2, h/2); pixel (x,y) counts when its
+        CENTRE (x+0.5, y+0.5) is inside that circle. The earlier index-based
+        math was offset by half a pixel and let strips of black background
+        show through as thin lines at the top/bottom/left/right rim.
         """
         w, h = self.w, self.h
-        cx, cy = (w - 1) / 2.0, (h - 1) / 2.0
-        R = min(w, h) / 2.0 - 0.5
+        cx, cy = w / 2.0, h / 2.0
+        R = min(w, h) / 2.0
         rects = []
         for y in range(h):
-            dy = y - cy
-            half = R if abs(dy) >= R else int(round((R * R - dy * dy) ** 0.5))
-            x0 = max(0, int(round(cx - half)))
-            x1 = min(w, int(round(cx + half)) + 1)
+            dy = (y + 0.5) - cy
+            if abs(dy) >= R:
+                continue
+            half = (R * R - dy * dy) ** 0.5
+            x0 = math.ceil(cx - half - 0.5)
+            x1 = math.floor(cx + half - 0.5) + 1
+            x0, x1 = max(0, x0), min(w, x1)
             if x1 > x0:
                 rects.append((x0, y, x1 - x0, 1))
         self._set_shape(shape.SK.Bounding, rects)
