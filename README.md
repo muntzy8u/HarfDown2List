@@ -73,7 +73,7 @@ left safely on the clipboard.
 **System packages** (Debian/Ubuntu names):
 
     sudo apt install python3 python3-venv python3-pip xdotool xclip \
-                     libportaudio2 fonts-dejavu-core scrot pulseaudio-utils \
+                     libportaudio2 fonts-dejavu-core pulseaudio-utils \
                      espeak-ng libnotify-bin
 
 **Python** — create a venv and install (versions are what this build was
@@ -194,7 +194,7 @@ Rule format — an exact JSON list of pairs:
 History: ~/.local/state/HarfDown2List/history.jsonl
 Logs:    ~/.local/state/HarfDown2List/hd2l.log
 
-## Status (verified on the dev box, 2026-09-11)
+## Status (verified on the dev box, 2026-10-15)
 
 - [x] pill renders, click-to-expand, X/tick zones, hover highlight
 - [x] capture -> transcribe -> polish -> paste at focused cursor
