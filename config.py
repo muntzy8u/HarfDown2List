@@ -103,7 +103,9 @@ RESTORE_CLIPBOARD = True
 RESTORE_CLIPBOARD_DELAY_S = 0.3
 
 # --- TTS (voice read-back of transcripts / answers) ---
-# Voice personas in voice_out.py: michaela, libby, ryan, sonia, aussie_f,
-# aussie_m, us_f, us_m. Michaela = en-US-AriaNeural (US female).
+# Voice personas in voice_out.py: emma, jenny, michaela, maisie, libby, ryan,
+# sonia, aussie_f, aussie_m, us_f, us_m.
+# emma = en-US-EmmaNeural (cheerful, friendly US female — default)
+# maisie = young en-GB female; libby = en-GB friendly; natasha = en-AU.
 TTS_ENABLED = False          # speak the final transcript after pasting
-TTS_PERSONA = "michaela"
+TTS_PERSONA = "emma"

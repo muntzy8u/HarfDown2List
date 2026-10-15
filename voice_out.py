@@ -1,6 +1,7 @@
 """Voice read-back: speak the final transcript or an agent's answer aloud.
 
-Michaela = edge-tts en-US-AriaNeural (free, no API key, no account).
+Default persona emma = edge-tts en-US-EmmaNeural (cheerful, friendly —
+free, no API key, no account); the full cast is in the VOICES map below.
 Runs as a background process; audio plays through the default sink.
 If edge-tts is missing or offline, falls back to espeak-ng.
 """
@@ -14,6 +15,9 @@ import config
 # Voice personas: (edge-tts voice, espeak-ng fallback)
 VOICES = {
     "michaela": ("en-US-AriaNeural", "en-us"),
+    "emma": ("en-US-EmmaNeural", "en-us"),
+    "jenny": ("en-US-JennyNeural", "en-us"),
+    "maisie": ("en-GB-MaisieNeural", "en+rp"),
     "libby": ("en-GB-LibbyNeural", "en+rp"),
     "sonia": ("en-GB-SoniaNeural", "en+rp"),
     "ryan": ("en-GB-RyanNeural", "en"),

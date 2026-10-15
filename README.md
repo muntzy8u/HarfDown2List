@@ -63,7 +63,8 @@ left safely on the clipboard.
 - **Paste**: xclip + xdotool, terminal-aware (ctrl+shift+v in terminals,
   ctrl+v elsewhere). Your previous clipboard content is restored after.
 - **Voice read-out**: optional. Any TTS can speak the final transcript or an
-  agent's answer (Michaela = edge-tts en-US-AriaNeural, free, no key). The
+  agent's answer (default emma = edge-tts en-US-EmmaNeural, cheerful and
+  friendly, free, no key). The
   voice only reads what the model has already generated — it is a delivery
   layer, not an agent.
 
@@ -146,7 +147,7 @@ All model choices live in `config.py` — edit, then restart the app:
     audio.py      mic capture, level metering, silence trim, pause
     engine.py     partial/final transcription + LLM polish
     vocabulary.py custom dictionary (post-STT corrections before paste)
-    voice_out.py  TTS read-back personas (Michaela = en-US-AriaNeural)
+    voice_out.py  TTS read-back personas (default emma = en-US-EmmaNeural)
     paste.py      clipboard paste + no-window guard + history
     requirements.txt       pinned Python dependencies
 
