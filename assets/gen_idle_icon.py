@@ -1,13 +1,12 @@
-"""Regenerate the idle-button icon set (five professional renditions).
+"""Regenerate the idle-button icon (assets/idle-mic.png).
 
-Outputs into assets/ :
-  idle-mic.png            the DEFAULT icon (v1) — wired via config.BUBBLE_ICON
-  icons/idle-mic-1..5.png all five variants, 256 px, transparent
-  icons-preview.png       labeled contact sheet: each icon composited on the
-                          app's real dark-glass disc at 4x pill scale
+The shipped default is the v6 "mix" recipe — the v3 accent-gradient mic
+centre inside a v5 badge ring. Recipes for all earlier audition variants
+stay recorded in VARIANTS so any of them can be re-emitted by changing
+main() if a rethink is ever wanted.
 
-All glyphs are drawn at 8x supersampling then LANCZOS-downscaled, so edges
-stay smooth/crisp when the app shrinks them onto the small pill.
+Drawn at 8x supersampling then LANCZOS-downscaled; output is 56x56, the
+exact BUBBLE_W/BUBBLE_H size, pasted 1:1 by ui_bubble.py.
 
 Usage:  ./venv/bin/python assets/gen_idle_icon.py
 Design dials are the constants below.
@@ -183,15 +182,8 @@ def make_variant(name):
 
 
 def main():
-    os.makedirs(ICONS, exist_ok=True)
-    for name in VARIANTS:
-        p = os.path.join(ICONS, f"{name}.png")
-        make_variant(name).save(p)
-        print("wrote", p, "-", VARIANTS[name]["desc"])
-    # default icon file = v6 (user's pick: v3 centre + v5 ring)
     make_variant("idle-mic-6").save(os.path.join(ASSETS, "idle-mic.png"))
-    print("wrote", os.path.join(ASSETS, "idle-mic.png"), "(default: v6 mix)")
-    print("preview:", preview())
+    print("wrote", os.path.join(ASSETS, "idle-mic.png"), "(56x56, default)")
 
 
 if __name__ == "__main__":
