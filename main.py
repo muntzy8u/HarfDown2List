@@ -1,0 +1,478 @@
+"""harfdown2listen main app: state machine wiring mic, engine, UI, and paste."""
+import queue
+import select
+import signal
+import subprocess
+import sys
+import threading
+import time
+
+import numpy as np
+
+import config
+import engine
+import paste
+import vocabulary
+import voice_out
+from audio import Mic
+from ui_bar import Bar
+from ui_bubble import Bubble, FLOWBAR, HANDSFREE, IDLE, PROCESSING, PTT_DOWN
+from ui_menu import Menu
+from xbase import XCtx
+
+# Xlib thread-safety: many threads paint UI layers
+from Xlib import threaded as xlib_threaded
+
+HANDSFREE_SILENCE_S = 1.6     # stop after this much trailing silence
+HANDSFREE_MAX_S = 120.0       # hard cap
+LEVEL_SMOOTH = 0.55            # EMA alpha for the waveform
+LEVEL_BOOST = 3.0              # mic RMS -> bar height gain
+
+
+class App:
+    def __init__(self):
+        self.ctx = XCtx()
+        self.mic = Mic()
+        self.bubble = Bubble(
+            self.ctx,
+            on_hold_start=self.ptt_start,
+            on_hold_end=self.ptt_end,
+            on_tap=self.tap,
+            on_menu=self.open_menu,
+            on_cancel=self.flowbar_cancel,
+            on_finish=self.flowbar_finish,
+            on_drag=self.reposition_bar,
+            on_wave_click=self.wave_click,
+        )
+        self.bar = Bar(self.ctx, 0, 0)
+        self.menu = Menu(self.ctx)
+        self.state = IDLE
+        self.rec_start = None
+        self.committed = ""
+        self.prev_partial = ""
+        self.last_transcript = ""
+        self.hidden = False
+        self._partial_stop = threading.Event()
+        self._final_lock = threading.RLock()
+        self._hf_last_voice = None
+        self._quit = threading.Event()
+        self._paste_after = None  # window id to check post-paste focus
+        self._hf_silence_s = HANDSFREE_SILENCE_S
+        self._hotkey_on = False
+
+    # ---------- hotkey (global PTT key) ----------
+    def _install_hotkey(self):
+        """Global hold-to-talk hotkey: hold F13 (remappable mouse button/key).
+
+        F13 is unbound by default on Linux desktops; map any mouse extra
+        button or key to F13 via xkbset / xdotool / input-remapper, then hold
+        it anywhere to dictate. Double-press quickly = hands-free
+        (window: config.HOTKEY_DOUBLE_PRESS_S).
+        """
+        from pynput import keyboard
+
+        self._last_f13_down = 0.0
+        self._hf_hotkey_active = False
+
+        def on_press(key):
+            if key == keyboard.Key[config.HOTKEY_PTT]:
+                now = time.monotonic()
+                if now - self._last_f13_down < config.HOTKEY_DOUBLE_PRESS_S:
+                    self.toggle_handsfree()
+                    self._hf_hotkey_active = True
+                else:
+                    self.ptt_start()
+                    self._hf_hotkey_active = False
+                self._last_f13_down = now
+            elif key == keyboard.Key.esc:
+                # Esc cancels an open dictation session anywhere
+                if self.state in (FLOWBAR, HANDSFREE, PTT_DOWN):
+                    self._cancel_session()
+                    print("[app] session cancelled via Esc", flush=True)
+
+        def on_release(key):
+            if key == keyboard.Key[config.HOTKEY_PTT]:
+                if not self._hf_hotkey_active:
+                    self.ptt_end()
+
+        try:
+            listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+            listener.start()
+            self._hotkey_listener = listener
+        except Exception as e:
+            print(f"[app] hotkey unavailable: {e}", file=sys.stderr)
+
+    # ---------- layer wiring ----------
+    def build(self):
+        from xbase import XLayer
+        import config as cfg
+
+        layer = XLayer(self.ctx, 0, 0, cfg.BUBBLE_W, cfg.BUBBLE_H)
+        # collapsed idle button is a true circle (visible + input shape)
+        layer.set_disc_visible()
+        self.bubble.attach_layer(layer)
+        self.bubble.set_state(IDLE)
+        layer.map()
+        self.bubble.paint()
+        # bar hidden until first dictation
+        self.bar.layer.move_resize(
+            0, 0, cfg.TRANSCRIPT_BAR_W, cfg.TRANSCRIPT_BAR_H
+        )
+        self.reposition_bar(self.bubble.pos)
+        # warm the engine so first press is fast
+        threading.Thread(target=self._warm, daemon=True).start()
+
+    def _warm(self):
+        try:
+            engine._get_model(config.PARTIAL_MODEL)
+            engine._get_model(config.FINAL_MODEL)
+        except Exception as e:
+            print(f"[app] warmup failed: {e}", file=sys.stderr)
+
+    # ---------- state transitions ----------
+    def ptt_start(self):
+        with self._final_lock:
+            if self.state == PROCESSING:
+                return
+        self._begin_session(PTT_DOWN)
+
+    def ptt_end(self):
+        if self.state != PTT_DOWN:
+            return
+        self._finish_session()
+
+    def tap(self):
+        """Click the collapsed pill: expand into the flow bar and record."""
+        if self.state == IDLE:
+            self.bubble.expand()
+            self._begin_session(FLOWBAR)
+
+    def flowbar_cancel(self):
+        """X in the flow bar: discard everything, collapse."""
+        if self.state in (FLOWBAR, PTT_DOWN, HANDSFREE):
+            self._cancel_session()
+
+    def flowbar_finish(self):
+        """Tick in the flow bar: transcribe + paste, then collapse."""
+        if self.state in (FLOWBAR, HANDSFREE):
+            self._finish_session()
+
+    def wave_click(self):
+        """Click the waveform zone: toggle pause/resume mid-dictation."""
+        if self.state not in (FLOWBAR, HANDSFREE):
+            return
+        self.bubble.paused = not self.bubble.paused
+        self.mic.set_paused(self.bubble.paused)
+        status = "paused — click waveform to resume" if self.bubble.paused else "listening…"
+        self.bar.set_text(self.committed, len(self.committed), status)
+        print(f"[app] dictation {'paused' if self.bubble.paused else 'resumed'}", flush=True)
+
+    def toggle_handsfree(self):
+        if self.state == HANDSFREE:
+            self._finish_session()
+        elif self.state == IDLE:
+            self._begin_session(HANDSFREE)
+
+    def _begin_session(self, new_state):
+        with self._final_lock:
+            self.state = new_state
+        self._partial_stop.clear()  # FIX: a previous cancel left this set forever
+        self.committed = ""
+        self.prev_partial = ""
+        self.bubble.paused = False
+        self.mic.set_paused(False)
+        self._hf_last_voice = time.monotonic()
+        self.mic.start_recording()
+        self.rec_start = time.monotonic()
+        self.bar.set_text("", 0, status="listening…")
+        self.bar.show()
+        self.bubble.set_state(new_state)
+        self.reposition_bar(self.bubble.pos)
+        threading.Thread(target=self._partial_loop, daemon=True).start()
+
+    def _cancel_session(self):
+        with self._final_lock:
+            self.state = IDLE
+        self._partial_stop.set()
+        self.mic.stop_recording()
+        self.mic.set_paused(False)
+        self.bubble.paused = False
+        self.committed = ""
+        self.prev_partial = ""
+        self.bubble.collapse()
+        self.bubble.set_state(IDLE)
+        self.bar.set_text("", 0, status="cancelled")
+        threading.Timer(1.0, self._hide_bar).start()
+
+    def _finish_session(self):
+        with self._final_lock:
+            self.state = PROCESSING
+        blocks = self.mic.stop_recording()
+        self.mic.set_paused(False)
+        self.bubble.paused = False
+        self._partial_stop.set()
+        self.bubble.set_state(PROCESSING)
+        self.bar.set_text(self.committed or "…", len(self.committed), "transcribing…")
+        audio = Mic.blocks_to_audio(blocks, trim=config.TRIM_SILENCE)
+        dur = len(audio) / config.SAMPLE_RATE
+        print(f"[app] session {dur:.1f}s audio captured", flush=True)
+
+        def work():
+            t0 = time.monotonic()
+            text = engine.transcribe_final(
+                audio, initial_prompt=vocabulary.initial_prompt()
+            )
+            if not text and self.committed:
+                text = self.committed
+            # user's bracket-correction convention first, then vocabulary,
+            # then optional LLM polish
+            text = vocabulary.apply_bracket_corrections(text)
+            text = vocabulary.apply(text)
+            if text and config.LLM_POLISH:
+                polished = engine.polish(text)
+                if polished:
+                    text = polished
+            dt = time.monotonic() - t0
+            print(f"[app] final: {dt:.1f}s  {text!r}", flush=True)
+            if text:
+                win = paste.get_active_window()
+                ok = paste.paste(
+                    text, restore=config.RESTORE_CLIPBOARD, win_id=win
+                )
+            else:
+                ok = False
+            if text:
+                paste.save_history(text, dur)
+                self.last_transcript = text
+                if config.TTS_ENABLED:
+                    voice_out.speak_async(text, config.TTS_PERSONA)
+            self._settle(ok and text != "")
+
+        t = threading.Thread(target=work, daemon=True)
+        t.start()
+
+    def _settle(self, ok):
+        with self._final_lock:
+            self.state = IDLE
+        self._partial_stop.clear()
+        self.bubble.collapse()
+        self.bar.set_text("", 0, status="done" if ok else "no speech detected")
+        self.bubble.set_state(IDLE)
+        threading.Timer(1.2, self._hide_bar).start()
+
+    def _hide_bar(self):
+        if self.state == IDLE:
+            self.bar.hide()
+
+    # ---------- live partials ----------
+    def _partial_loop(self):
+        """Re-transcribe the growing buffer with tiny.en every interval.
+
+        Wrapped: if a partial pass raises (model/decoder hiccup), log it
+        and keep the loop alive — live preview degrades, dictation does not.
+        """
+        prev = ""
+        while not self._partial_stop.is_set():
+            time.sleep(config.PARTIAL_INTERVAL_S)
+            if self._partial_stop.is_set() or self.state not in (PTT_DOWN, HANDSFREE, FLOWBAR):
+                return
+            if self.bubble.paused:
+                continue  # don't transcribe while paused
+            try:
+                if self.mic.recording:
+                    blocks = list(self.mic._buffered)
+                    audio = Mic.blocks_to_audio(blocks, trim=False)
+                    if audio.size > config.SAMPLE_RATE * config.PARTIAL_MAX_S:
+                        continue
+                    cur = engine.transcribe_partial(audio)
+                    # local agreement: commit longest agreed prefix
+                    committed_prefix = engine.stable_prefix(prev, cur)
+                    if len(committed_prefix) > len(self.committed):
+                        self.committed = committed_prefix
+                    # show committed + volatile tail
+                    if cur.startswith(self.committed):
+                        tail = cur[len(self.committed):].strip()
+                    else:
+                        tail = cur
+                    display = (self.committed + " " + tail).strip()
+                    self.bar.set_text(display, len(self.committed), "listening…")
+                    self.bubble.set_partial(display, len(self.committed))
+                    prev = cur
+            except Exception as e:
+                print(f"[app] partial pass failed ({e}); preview paused", flush=True)
+                time.sleep(1.0)  # brief backoff, then retry on next interval
+
+    # ---------- hands-free / flowbar auto-stop ----------
+    def _hf_check(self):
+        if self.state in (HANDSFREE, FLOWBAR) and self.rec_start is not None:
+            elapsed = time.monotonic() - self.rec_start
+            if self.bubble.paused:
+                return  # caps and silence-stop are suspended while paused
+            if self.state == FLOWBAR and elapsed > config.FLOWBAR_MAX_S:
+                print(f"[app] flowbar cap reached ({elapsed:.0f}s), finishing", flush=True)
+                self._finish_session()
+                return
+            # BOTH hands-free and flowbar: if no voice is heard for a while,
+            # stop and return to normal. Flowbar = config.FLOWBAR_SILENCE_S
+            # (1 minute), hands-free = config.HANDSFREE_SILENCE_S.
+            silent_s = (
+                config.FLOWBAR_SILENCE_S
+                if self.state == FLOWBAR
+                else self._hf_silence_s
+            )
+            silent_for = time.monotonic() - self._hf_last_voice
+            if silent_for >= silent_s:
+                print(f"[app] {self.state} silent for {silent_for:.0f}s, stopping", flush=True)
+                self._finish_session()
+                return
+            if self.state == HANDSFREE and elapsed > HANDSFREE_MAX_S:
+                self._finish_session()
+
+    # ---------- mic pump ----------
+    def _pump(self):
+        """UI-thread task: consume mic blocks, smooth level, hands-free watch."""
+        rms, n = self.mic.drain()
+        if n:
+            if rms > config.SILENCE_RMS:
+                self._hf_last_voice = time.monotonic()
+                sm = self.bubble.level * LEVEL_SMOOTH + min(1.0, rms * LEVEL_BOOST) * (
+                    1 - LEVEL_SMOOTH
+                )
+            else:
+                sm = self.bubble.level * 0.82
+            self.bubble.set_level(sm, rms)
+            self._hf_check()
+        # menu hover repainting handled in event loop
+
+    # ---------- menu ----------
+    def open_menu(self):
+        if self.menu.is_open():
+            self.menu.close()
+            return
+        bx, by = self.bubble.pos
+        items = [
+            ("Read selection aloud", "speak_selection"),
+            ("Paste last transcript", "paste_last"),
+            ("Speak last transcript", "speak_last"),
+            ("History", "history"),
+            ("Mic: default", "mic"),
+            ("Hide 1 hour", "hide"),
+            ("Quit", "quit"),
+        ]
+        self.menu.open(
+            bx + 6,
+            by - len(items) * 26 - 12,
+            items,
+            on_select=self.menu_select,
+            on_close=None,
+        )
+
+    def menu_select(self, payload):
+        print(f"[dbg] menu_select: {payload!r}", flush=True)
+        if payload == "speak_selection":
+            # Read whatever the user highlighted (PRIMARY selection) aloud —
+            # e.g. the model's reply in a terminal. No highlight = no-op.
+            sel = paste.get_selection()
+            print(f"[app] read-selection: got {len(sel) if sel else 0} chars", flush=True)
+            if sel:
+                voice_out.speak_async(sel, config.TTS_PERSONA)
+            else:
+                subprocess.Popen(
+                    ["notify-send", "harfdown2listen", "Nothing selected"]
+                )
+        elif payload == "paste_last":
+            if self.last_transcript:
+                paste.paste(self.last_transcript)
+        elif payload == "speak_last":
+            if self.last_transcript:
+                voice_out.speak_async(self.last_transcript, config.TTS_PERSONA)
+        elif payload == "history":
+            recs = paste.load_history(5)
+            text = "\n".join(r.get("text", "")[:80] for r in reversed(recs)) or "No history yet"
+            subprocess.Popen(["notify-send", "harfdown2listen", text])
+        elif payload == "mic":
+            subprocess.Popen(["notify-send", "harfdown2listen", "Mic config: edit config.py MIC_SOURCE"])
+        elif payload == "hide":
+            self.hide(3600)
+        elif payload == "quit":
+            self._quit.set()
+
+    def hide(self, seconds):
+        self.hidden = True
+        self.bubble.layer.unmap()
+        self.bar.hide()
+        threading.Timer(seconds, self._unhide).start()
+
+    def _unhide(self):
+        self.hidden = False
+        self.bubble.layer.map()
+        self.bubble.paint()
+
+    def reposition_bar(self, pos):
+        bx, by = self._bar_xy(pos)
+        self.bar.layer.move(bx, by)
+
+    def _bar_xy(self, pos):
+        bw, bh = config.TRANSCRIPT_BAR_W, config.TRANSCRIPT_BAR_H
+        # center the bar on the widget's CURRENT width (pill or expanded bar)
+        cur_w = self.bubble.layer.w
+        bx = pos[0] + (cur_w - bw) // 2
+        by = pos[1] - bh - 10
+        if by < 4:
+            by = pos[1] + self.bubble.layer.h + 10
+        bx = max(4, min(bx, self.ctx.sw - bw - 4))
+        return int(bx), int(by)
+
+    # ---------- main loop ----------
+    def run(self):
+        self.build()
+        self.mic.start()
+        self._install_hotkey()
+        print("[app] bubble up — hold to talk, click for hands-free", flush=True)
+        d = self.ctx.d
+        try:
+            while not self._quit.is_set():
+                while d.pending_events() > 0:
+                    e = d.next_event()
+                    self._dispatch(e)
+                self._pump()
+                self._hf_check()
+                if self.state == PROCESSING:
+                    self.bubble.paint()
+                select.select([d], [], [], 0.03)
+        finally:
+            self.mic.stop()
+            self.menu.close()
+            self.bar.layer.destroy()
+            self.bubble.layer.destroy()
+            print("[app] bye", flush=True)
+
+    def _dispatch(self, e):
+        from Xlib import X
+
+        t = e.type
+        if self.menu.is_open():
+            mw = self.menu.window()
+            # compare X resource ids, not object identity: python-xlib may
+            # wrap the same X window in different Python objects per event
+            if mw is not None and getattr(e, "window", None) is not None \
+                    and e.window.id == mw.id:
+                self.menu.handle_event(e)
+                return
+            # swallow the right-button release that follows opening the menu
+            # (the release lands on the bubble layer and would close it)
+            if t == X.ButtonRelease and e.detail == 3:
+                return
+            if t in (X.ButtonPress, X.ButtonRelease):
+                self.menu.close()
+            return
+        if t in (X.ButtonPress, X.ButtonRelease, X.MotionNotify, X.Expose):
+            self.bubble.handle_event(e)
+
+
+def main():
+    App().run()
+
+
+if __name__ == "__main__":
+    main()
