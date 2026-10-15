@@ -37,6 +37,10 @@ VOICES = {
 }
 
 
+def _log(msg):
+    print(f"[tts] {msg}", flush=True)
+
+
 def _voice_dir():
     return os.path.expanduser(getattr(config, "TTS_PIPER_DATA_DIR",
                                       "~/.local/state/HarfDown2List/voices"))
@@ -55,8 +59,10 @@ def _piper_rate():
         with open(os.path.join(_voice_dir(), _piper_voice() + ".onnx.json"),
                   encoding="utf-8") as f:
             meta = json.load(f)
-        return int(meta.get("audio", {}).get("sampling_rate")
-                   or meta.get("sampling_rate") or 22050)
+        rate = (meta.get("audio", {}).get("sample_rate")
+                or meta.get("audio", {}).get("sampling_rate")
+                or meta.get("sample_rate") or meta.get("sampling_rate"))
+        return int(rate or 22050)
     except Exception:
         return 22050
 
@@ -133,10 +139,14 @@ def speak(text, persona=None):
                  (_speak_edge, (text, edge_voice)),
                  (_speak_espeak, (text, espeak_voice)))
     for engine, args in chain:
+        name = engine.__name__[7:]   # _speak_piper -> piper
         try:
-            return engine(*args)
-        except Exception:
-            continue
+            play = engine(*args)
+            _log(f"speaking with {name}")
+            return play
+        except Exception as e:
+            _log(f"{name} failed: {e}")
+    _log("no engine worked; nothing was spoken")
     return None
 
 
