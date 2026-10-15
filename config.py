@@ -16,19 +16,20 @@ FINAL_MODEL = "small"
 # (ollama) that removes fillers ("um", "uh", false starts) and resolves
 # self-corrections ("let's meet at 5, actually 6" -> "Let's meet at 6 pm").
 # MEASURED (2026-10-15):
-#   glm-5.3-flash:cloud        -> 0.7-2s incl. long dictations — DEFAULT
-#                                (needs the local router on 11434; if it is
-#                                down, polish fails fast and raw ships)
-#   qwen3.5:2b   + think:false -> ~3.2s warm local, but full-local polish of
-#                                medium/long dictations exceeds CPU-friendly
-#                                timeouts — the documented 100%-local option
-#   qwen2.5:1.5b + think:false -> ~1.1s warm, but leaks "Sure, let's clean
-#                                up the voice dictation:" into the text
+#   gemma4:cloud               -> 0.6-2s incl. long dictations, honours
+#                                think:false, returns ONLY the cleaned
+#                                dictation — DEFAULT
+#   minimaxm3-cloud            -> 1.4s clean, minor caps ("Llama notes")
+#   glm-5.3-flash:cloud        -> UNUSABLE for polish: ignores think:false
+#                                and returns its reasoning instead
+#   qwen3.5:cloud              -> 410 Gone (retired)
 #   deepseek-v4-flash:cloud    -> RETIRED by the router 2026-09-25 (HTTP 410)
 # NOTE: "think": false is REQUIRED for cloud router models or they reason
 # until the token budget is gone and return empty content; qwen3.5 accepts it.
+# Test any new candidate with a real dictation before trusting it — some
+# cloud models return reasoning text that would leak into pastes.
 LLM_POLISH = True
-LLM_POLISH_MODEL = "glm-5.3-flash:cloud"
+LLM_POLISH_MODEL = "gemma4:cloud"
 # Max seconds to wait for the polish LLM; on timeout the raw (vocabulary-
 # corrected) transcript ships. 10 s also covers cloud latency spikes.
 LLM_POLISH_TIMEOUT = 10.0

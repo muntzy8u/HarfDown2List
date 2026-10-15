@@ -103,7 +103,7 @@ Python >= 3.13 recommended (developed on 3.13.5).
   telemetry. This is the default configuration.
 - **Optional, only if enabled**: the LLM polish pass calls your own
   configured endpoint (default: the local Ollama-compatible router with
-  `glm-5.3-flash:cloud`, ~1–2 s per dictation, verified in testing). For a
+  `gemma4:cloud`, ~0.6–2 s per dictation, verified in testing). For a
   fully local setup, `config.py` documents `qwen3.5:2b` (~3 s warm for short
   dictations; medium/long exceed CPU-friendly timeouts). If the endpoint is
   down, the raw transcript ships immediately. Each dictation is one small
@@ -134,7 +134,7 @@ All model choices live in `config.py` — edit, then restart the app:
   the final pass take longer than a quick dictation.
 - **LLM polish** is optional. `LLM_POLISH = False` turns it off entirely;
   the app then always pastes the raw transcript. Default model:
-  `glm-5.3-flash:cloud` (fast; needs the local router). For a 100%-local
+  `gemma4:cloud` (fast; needs the local router). For a 100%-local
   machine, set `LLM_POLISH_MODEL` to e.g. `qwen3.5:2b` (~3 s warm for short
   dictations; long ones exceed CPU-friendly timeouts). `LLM_POLISH_TIMEOUT`
   (default 10 s) lets a slow endpoint fail over to raw text.
