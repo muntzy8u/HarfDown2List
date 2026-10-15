@@ -63,8 +63,6 @@ FLOWBAR_SILENCE_S = 60.0
 # Collapsed idle button is a CIRCLE (BUBBLE_W == BUBBLE_H). ~1.5 cm at 96 dpi ≈ 56px.
 BUBBLE_W = 56
 BUBBLE_H = 56
-# Idle face: hd.jpg shrunk into the black circle button (image kept, just scaled).
-BUBBLE_IMG = os.path.join(os.path.dirname(__file__), "assets", "hd.jpg")
 # Idle-button icon pasted over the dark glass disc — a generated professional
 # mic sized 1:1 to the pill (56x56 = BUBBLE_W/BUBBLE_H; regen/tweak:
 # venv/bin/python assets/gen_idle_icon.py). None = the built-in rough drawn

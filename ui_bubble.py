@@ -35,18 +35,6 @@ from xbase import (
     text_size,
 )
 
-# Idle button face: hd.jpg loaded once, kept exactly as-is (only resized for
-# display). Fallback to None if the asset is missing — the pill falls back to
-# the gradient style below.
-hd_img = None
-try:
-    if config.BUBBLE_IMG and os.path.exists(config.BUBBLE_IMG):
-        # Original image kept exactly as-is (no auto-crop) — shown full when idle.
-        hd_img = Image.open(config.BUBBLE_IMG).convert("RGB")
-except Exception as e:
-    print(f"[bubble] idle image unavailable ({e}); using gradient pill", flush=True)
-    hd_img = None
-
 # Optional user-supplied idle button icon (BUBBLE_ICON config). Loaded once.
 # If SVG, we need cairosvg; PNG/JPEG load straight in. Returns None when
 # unset or unreadable -> falls back to the built-in drawn mic glyph.

@@ -187,8 +187,8 @@ Rule format — an exact JSON list of pairs:
     vocabulary.py custom dictionary (post-STT corrections before paste)
     voice_out.py  TTS engines (piper local -> edge-tts -> espeak) + personas
     paste.py      clipboard paste + no-window guard + history
-    assets/gen_idle_icon.py idle-icon generator: six variants + preview sheet
-    assets/idle-mic.png    default idle mic icon (config.BUBBLE_ICON points here)
+    assets/gen_idle_icon.py generates assets/idle-mic.png (design dials inside)
+    assets/idle-mic.png    idle mic icon shown on the pill (config.BUBBLE_ICON)
     requirements.txt       pinned Python dependencies
 
 History: ~/.local/state/HarfDown2List/history.jsonl
