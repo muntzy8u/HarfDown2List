@@ -62,10 +62,11 @@ left safely on the clipboard.
   transcription, before paste and before polish.
 - **Paste**: xclip + xdotool, terminal-aware (ctrl+shift+v in terminals,
   ctrl+v elsewhere). Your previous clipboard content is restored after.
-- **Voice read-out**: optional. Any TTS can speak the final transcript or an
-  agent's answer (default emma = edge-tts en-US-EmmaNeural, cheerful and
-  friendly, free, no key). The
-  voice only reads what the model has already generated — it is a delivery
+- **Voice read-out**: optional, off by default (`TTS_ENABLED`). Piper (local
+  neural TTS) speaks it: clear voice, fully offline, streams straight into
+  `paplay` — no audio files are created. Fallback chain: edge-tts (Microsoft
+  cloud; it 403s whenever MS rotates its handshake token) then espeak-ng.
+  The voice only reads what the model has already generated — a delivery
   layer, not an agent.
 
 ## Requirements
@@ -90,7 +91,10 @@ Python >= 3.13 recommended (developed on 3.13.5).
   `pactl set-default-source` or `MIC_SOURCE` in config.py).
 - ~500 MB disk for the two Whisper models (auto-downloaded on first run
   from HuggingFace, then cached in ~/.cache/huggingface).
-- Optional: Ollama or any OpenAI-compatible server for the polish pass.
+- Optional: Ollama (or any server speaking Ollama's `/api/chat`) for the
+  polish pass.
+- Optional: piper TTS voice (~63 MB, downloaded on first speech into
+  `~/.local/state/HarfDown2List/voices` — free, offline afterwards).
 
 ## Cost — what runs where
 
@@ -136,6 +140,12 @@ All model choices live in `config.py` — edit, then restart the app:
 - The polish endpoint is fixed to local Ollama (`127.0.0.1:11434`) in
   `engine.py` (the `OLLAMA` constant) — a one-line edit there aims polish
   at any server speaking the same `/api/chat` shape.
+- **Voice**: engine and voices are `config.py` switches too — `TTS_ENGINE`
+  (`piper` local default / `edge` cloud), `TTS_PIPER_VOICE` (any piper
+  voice name, e.g. `en_US-lessac-medium`, downloaded to
+  `TTS_PIPER_DATA_DIR` on first use) and `TTS_PERSONA` for the cloud
+  voices (emma, jenny, michaela, maisie, libby, ryan, sonia, aussie_f,
+  aussie_m, us_f, us_m).
 
 ## Files
 
@@ -147,7 +157,7 @@ All model choices live in `config.py` — edit, then restart the app:
     audio.py      mic capture, level metering, silence trim, pause
     engine.py     partial/final transcription + LLM polish
     vocabulary.py custom dictionary (post-STT corrections before paste)
-    voice_out.py  TTS read-back personas (default emma = en-US-EmmaNeural)
+    voice_out.py  TTS engines (piper local -> edge-tts -> espeak) + personas
     paste.py      clipboard paste + no-window guard + history
     requirements.txt       pinned Python dependencies
 

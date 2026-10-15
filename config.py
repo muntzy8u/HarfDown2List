@@ -109,3 +109,13 @@ RESTORE_CLIPBOARD_DELAY_S = 0.3
 # maisie = young en-GB female; libby = en-GB friendly; natasha = en-AU.
 TTS_ENABLED = False          # speak the final transcript after pasting
 TTS_PERSONA = "emma"
+# Engine order for actually making sound: "piper" (local neural TTS, offline,
+# streams straight into paplay — no audio files, no cloud, no 403s) or
+# "edge" (Microsoft cloud via edge-tts; nicer accents but 403s whenever MS
+# rotates its handshake token).
+TTS_ENGINE = "piper"
+# piper voice (downloaded on first use into TTS_PIPER_DATA_DIR; more at
+# rhasspy/piper-voices: en_US-lessac-medium, en_GB-alba-medium, en_US-joe…):
+TTS_PIPER_VOICE = "en_US-amy-medium"
+TTS_PIPER_DATA_DIR = os.path.expanduser("~/.local/state/HarfDown2List/voices")
+TTS_PIPER_RATE = 0    # 0 = read the rate from the voice's .json (≈22050 Hz)

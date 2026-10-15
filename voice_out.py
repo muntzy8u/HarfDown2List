@@ -1,18 +1,27 @@
 """Voice read-back: speak the final transcript or an agent's answer aloud.
 
-Default persona emma = edge-tts en-US-EmmaNeural (cheerful, friendly —
-free, no API key, no account); the full cast is in the VOICES map below.
-Runs as a background process; audio plays through the default sink.
-If edge-tts is missing or offline, falls back to espeak-ng.
+Engines, tried in order (config.TTS_ENGINE puts one first):
+  piper    — local neural TTS (piper-tts). Clear voice, fully offline, no
+             tokens; streams raw PCM straight into paplay, so no audio
+             files are created at all. DEFAULT.
+  edge-tts — Microsoft cloud. Prettier accents, but needs network and gets
+             403 whenever MS rotates the Sec-MS-GEC handshake token
+             (audio only arrives as a downloadable clip).
+  espeak-ng — last-resort robotic fallback.
+
+All free, no API keys, no accounts.
 """
 import os
+import shutil
 import subprocess
 import tempfile
 import threading
 
 import config
 
-# Voice personas: (edge-tts voice, espeak-ng fallback)
+# Persona map: persona -> (edge-tts voice, espeak-ng fallback).
+# Piper is persona-independent: its voice comes from config.TTS_PIPER_VOICE
+# (local model files, e.g. en_US-amy-medium, en_US-lessac-medium).
 VOICES = {
     "michaela": ("en-US-AriaNeural", "en-us"),
     "emma": ("en-US-EmmaNeural", "en-us"),
@@ -28,20 +37,66 @@ VOICES = {
 }
 
 
-def speak(text, persona=None):
-    """Speak text aloud (non-blocking). Returns the launched process or None."""
-    if not text or not text.strip():
-        return None
-    persona = persona or config.TTS_PERSONA
-    edge_voice, espeak_voice = VOICES.get(persona, VOICES["michaela"])
+def _voice_dir():
+    return os.path.expanduser(getattr(config, "TTS_PIPER_DATA_DIR",
+                                      "~/.local/state/HarfDown2List/voices"))
+
+
+def _piper_voice():
+    return getattr(config, "TTS_PIPER_VOICE", "en_US-amy-medium")
+
+
+def _piper_rate():
+    """Audio sample rate of the loaded piper voice (Hz)."""
+    rate = getattr(config, "TTS_PIPER_RATE", 0)
+    if rate:
+        return int(rate)
     try:
-        return _speak_edge(text, edge_voice)
+        with open(os.path.join(_voice_dir(), _piper_voice() + ".onnx.json"),
+                  encoding="utf-8") as f:
+            meta = json.load(f)
+        return int(meta.get("audio", {}).get("sampling_rate")
+                   or meta.get("sampling_rate") or 22050)
     except Exception:
-        return _speak_espeak(text, espeak_voice)
+        return 22050
 
 
-def _speak_edge(text, voice):
-    """edge-tts via the venv binary; writes a temp mp3 then plays it."""
+def _piper_pkg():
+    """(piper executable, voice) if piper + its model are both present."""
+    exe = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       "venv", "bin", "piper")
+    if not os.path.exists(exe):
+        exe = shutil.which("piper")
+        if not exe:
+            raise RuntimeError("piper not installed")
+    if not os.path.exists(os.path.join(_voice_dir(), _piper_voice() + ".onnx")):
+        raise RuntimeError(
+            "piper voice '%s' missing in %s (download with: venv/bin/python "
+            "-m piper.download_voices --download-dir '%s' '%s')"
+            % (_piper_voice(), _voice_dir(), _voice_dir(), _piper_voice()))
+    return exe, _piper_voice()
+
+
+def _speak_piper(text, persona=None):
+    """Piper synth -> raw PCM piped straight into paplay. No temp files."""
+    exe, voice = _piper_pkg()
+    piper = subprocess.Popen(
+        [exe, "--data-dir", _voice_dir(), "-m", voice, "--output-raw"],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL)
+    play = subprocess.Popen(
+        ["paplay", "--raw", "--format=s16le",
+         "--rate=%d" % _piper_rate(), "--channels=1"],
+        stdin=piper.stdout, stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL)
+    piper.stdout.close()
+    piper.stdin.write((text + "\n").encode("utf-8"))
+    piper.stdin.close()
+    return play
+
+
+def _speak_edge(text, edge_voice):
+    """edge-tts via the venv binary; writes a temp clip then plays it."""
     exe = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "venv", "bin", "edge-tts")
     if not os.path.exists(exe):
@@ -49,16 +104,40 @@ def _speak_edge(text, voice):
     out = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
     out.close()
     subprocess.run(
-        [exe, "--voice", voice, "--text", text, "--write-media", out.name],
+        [exe, "--voice", edge_voice, "--text", text, "--write-media", out.name],
         check=True, capture_output=True, timeout=30,
     )
     return subprocess.Popen(["paplay", out.name],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def _speak_espeak(text, voice):
-    cmd = ["espeak-ng", "-v", voice, text]
-    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def _speak_espeak(text, espeak_voice):
+    cmd = ["espeak-ng", "-v", espeak_voice, text]
+    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL)
+
+
+def speak(text, persona=None):
+    """Speak text aloud with the configured engine chain (non-blocking).
+    Returns the playback process of the engine that worked, or None."""
+    if not text or not text.strip():
+        return None
+    persona = persona or config.TTS_PERSONA
+    edge_voice, espeak_voice = VOICES.get(persona, VOICES["emma"])
+    if getattr(config, "TTS_ENGINE", "piper") == "edge":
+        chain = ((_speak_edge, (text, edge_voice)),
+                 (_speak_piper, (text, persona)),
+                 (_speak_espeak, (text, espeak_voice)))
+    else:
+        chain = ((_speak_piper, (text, persona)),
+                 (_speak_edge, (text, edge_voice)),
+                 (_speak_espeak, (text, espeak_voice)))
+    for engine, args in chain:
+        try:
+            return engine(*args)
+        except Exception:
+            continue
+    return None
 
 
 def speak_async(text, persona=None):
