@@ -391,7 +391,9 @@ class Bubble:
             if _user_icon is not None:
                 try:
                     ic = _user_icon
-                    side = min(w, h) - 18  # leave breathing room around the icon
+                    # BUBBLE_ICON PNGs are sized 1:1 to the pill (56x56 =
+                    # BUBBLE_W/BUBBLE_H): paste at full size, zero resample
+                    side = min(w, h)
                     scale = min(side / ic.size[0], side / ic.size[1])
                     dw, dh = max(1, int(ic.size[0] * scale)), max(1, int(ic.size[1] * scale))
                     thumb = ic.resize((dw, dh))

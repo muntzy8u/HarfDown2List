@@ -66,8 +66,9 @@ BUBBLE_H = 56
 # Idle face: hd.jpg shrunk into the black circle button (image kept, just scaled).
 BUBBLE_IMG = os.path.join(os.path.dirname(__file__), "assets", "hd.jpg")
 # Idle-button icon pasted over the dark glass disc — a generated professional
-# mic (regenerate/tweak: venv/bin/python assets/gen_idle_icon.py). Set to None
-# for the built-in rough drawn mic glyph, or point it at any PNG/SVG of your own.
+# mic sized 1:1 to the pill (56x56 = BUBBLE_W/BUBBLE_H; regen/tweak:
+# venv/bin/python assets/gen_idle_icon.py). None = the built-in rough drawn
+# mic glyph; or point it at any PNG/SVG of your own.
 BUBBLE_ICON = os.path.join(os.path.dirname(__file__), "assets", "idle-mic.png")
 # expanded flow bar: [X | waveform | tick]
 FLOWBAR_W = 280

@@ -21,9 +21,11 @@ from PIL import Image, ImageDraw, ImageFilter
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = HERE
 ICONS = os.path.join(ASSETS, "icons")
-TARGET = 256            # output png size
+TARGET = 56             # output png size — matches BUBBLE_W/BUBBLE_H exactly,
+                        # so the app pastes it 1:1 (no resize, zero blur)
 SS = 8                  # supersample factor (draw at TARGET * SS)
 S = TARGET * SS
+K = S / 2048.0          # scale from the 2048-px design-space constants
 
 C_TOP = (240, 244, 250)   # capsule top colour (bright silver-blue)
 C_BOT = (176, 188, 204)   # capsule bottom colour
@@ -55,7 +57,8 @@ def colorize(mask, c_top, c_bot):
 def capsule_mask():
     m = Image.new("L", (W, H), 0)
     ImageDraw.Draw(m).rounded_rectangle(
-        [cx - 170, 500, cx + 170, 1140], radius=170, fill=255)
+        [cx - 170 * K, 500 * K, cx + 170 * K, 1140 * K],
+        radius=170 * K, fill=255)
     return m
 
 
@@ -63,10 +66,13 @@ def stand_mask():
     m = Image.new("L", (W, H), 0)
     sd = ImageDraw.Draw(m)
     # PIL arcs sweep clockwise: 5°..175° passes 6 o'clock (bottom U cradle)
-    sd.arc([cx - 300, 760, cx + 300, 1360], start=5, end=175,
-           fill=255, width=120)
-    sd.line([cx, 1340, cx, 1500], fill=255, width=100)
-    sd.rounded_rectangle([cx - 180, 1515, cx + 180, 1595], radius=40, fill=255)
+    sd.arc([cx - 300 * K, 760 * K, cx + 300 * K, 1360 * K],
+           start=5, end=175, fill=255, width=max(1, int(120 * K)))
+    sd.line([cx, 1340 * K, cx, 1500 * K], fill=255,
+            width=max(1, int(100 * K)))
+    sd.rounded_rectangle(
+        [cx - 180 * K, 1515 * K, cx + 180 * K, 1595 * K],
+        radius=40 * K, fill=255)
     return m
 
 
@@ -77,11 +83,12 @@ def compose(cap_mode="fill", use="silver", ring=False, glow=False):
     if cap_mode == "outline":
         # outline ring = outer capsule minus an inner capsule (no MaxFilter:
         # big-kernel filters on a 2048px canvas take forever)
-        stroke = 90
+        stroke = 90 * K
         o = capsule_mask()
         ImageDraw.Draw(o).rounded_rectangle(
-            [cx - 170 + stroke, 500 + stroke, cx + 170 - stroke, 1140 - stroke],
-            radius=170 - stroke, fill=0)
+            [cx - 170 * K + stroke, 500 * K + stroke,
+             cx + 170 * K - stroke, 1140 * K - stroke],
+            radius=170 * K - stroke, fill=0)
         cap = o
     if use == "accent":
         cap_img = colorize(cap, C_ACCENT_A, C_ACCENT_B)
@@ -92,7 +99,7 @@ def compose(cap_mode="fill", use="silver", ring=False, glow=False):
     img = np.maximum(cap_img, stand_img)
     if glow:
         g = Image.fromarray(img, "RGBA")
-        blur = g.filter(ImageFilter.GaussianBlur(radius=26))
+        blur = g.filter(ImageFilter.GaussianBlur(radius=max(2, 26 * K)))
         base = np.zeros((H, W, 4), dtype=np.float32)
         b = np.asarray(blur, dtype=np.float32)
         base[..., :3] = 255.0
@@ -102,9 +109,12 @@ def compose(cap_mode="fill", use="silver", ring=False, glow=False):
                       0, 255).astype(np.uint8)
     if ring:
         r = Image.new("L", (W, H), 0)
-        # thin accent ring just inside the outer edge (badge look)
+        # thin accent ring just inside the outer edge (badge look); inset
+        # keeps a clean gap from the app's own 3px C_EDGE border at 1:1 size
+        m = int(200 * K)
         d = ImageDraw.Draw(r)
-        d.ellipse([64, 64, W - 64, H - 64], outline=255, width=26)
+        d.ellipse([m, m, W - m, H - m], outline=255,
+                  width=max(3, int(26 * K)))
         # alpha_COMPOSITE the ring layer (never add RGBA arrays: adding the
         # ring's RGB into every pixel washed the glyph toward white)
         base = Image.fromarray(img, "RGBA")
@@ -153,13 +163,10 @@ def preview():
     names = list(VARIANTS)
     for i, name in enumerate(names):
         x0 = pad + i * (cell + pad)
-        icon = Image.fromarray(
-            np.asarray(make_variant(name)), "RGBA")
-        # composite icon onto the disc at 4x pill scale (icon = 88/152 of disc)
+        # 1:1 composite (icon canvas == disc size, same as the app pastes it)
+        icon = make_variant(name)
         d = disc(cell)
-        side = int(cell * 152 / 224)
-        ic = icon.resize((side, side), Image.LANCZOS)
-        d.alpha_composite(ic, ((cell - side) // 2, (cell - side) // 2))
+        d.alpha_composite(icon.resize((cell, cell), Image.LANCZOS), (0, 0))
         sheet.paste(d, (x0, pad), d)
         ImageDraw.Draw(sheet).text(
             (x0 + cell // 2 - 12, pad + cell + 10),
