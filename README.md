@@ -102,11 +102,12 @@ Python >= 3.13 recommended (developed on 3.13.5).
   partials, final transcription, paste, UI. No API keys, no accounts, no
   telemetry. This is the default configuration.
 - **Optional, only if enabled**: the LLM polish pass calls your own
-  configured endpoint (default: local Ollama, model `qwen3.5:2b`). Point it at a
-  local model and it's free too (~3 s/dictation warm on this hardware —
-  measured, see config.py). Cloud models are faster but cost whatever your
-  provider charges per request; each dictation is one small chat request
-  (a few hundred tokens).
+  configured endpoint (default: the local Ollama-compatible router with
+  `glm-5.3-flash:cloud`, ~1–2 s per dictation, verified in testing). For a
+  fully local setup, `config.py` documents `qwen3.5:2b` (~3 s warm for short
+  dictations; medium/long exceed CPU-friendly timeouts). If the endpoint is
+  down, the raw transcript ships immediately. Each dictation is one small
+  chat request (a few hundred tokens).
 
 ## Run
 
@@ -132,11 +133,11 @@ All model choices live in `config.py` — edit, then restart the app:
   but slower: a large model on CPU will lag the live preview and make
   the final pass take longer than a quick dictation.
 - **LLM polish** is optional. `LLM_POLISH = False` turns it off entirely;
-  the app then always pastes the raw transcript. To use different models,
-  set `LLM_POLISH_MODEL` to any model your Ollama already has
-  (e.g. `qwen2.5:1.5b` — fastest local choice; the default `qwen3.5:2b`
-  polishes in ~3 s once warm). `LLM_POLISH_TIMEOUT` (default 5 s) lets a
-  slow endpoint fail over to raw text mid-dictation.
+  the app then always pastes the raw transcript. Default model:
+  `glm-5.3-flash:cloud` (fast; needs the local router). For a 100%-local
+  machine, set `LLM_POLISH_MODEL` to e.g. `qwen3.5:2b` (~3 s warm for short
+  dictations; long ones exceed CPU-friendly timeouts). `LLM_POLISH_TIMEOUT`
+  (default 10 s) lets a slow endpoint fail over to raw text.
 - The polish endpoint is fixed to local Ollama (`127.0.0.1:11434`) in
   `engine.py` (the `OLLAMA` constant) — a one-line edit there aims polish
   at any server speaking the same `/api/chat` shape.
