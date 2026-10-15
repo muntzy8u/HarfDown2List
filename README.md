@@ -187,6 +187,7 @@ Rule format — an exact JSON list of pairs:
     vocabulary.py custom dictionary (post-STT corrections before paste)
     voice_out.py  TTS engines (piper local -> edge-tts -> espeak) + personas
     paste.py      clipboard paste + no-window guard + history
+    assets/idle-mic.png    generated idle mic icon (regenerate: assets/gen_idle_icon.py)
     requirements.txt       pinned Python dependencies
 
 History: ~/.local/state/HarfDown2List/history.jsonl
