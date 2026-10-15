@@ -51,8 +51,9 @@ left safely on the clipboard.
 - **STT**: faster-whisper int8 on CPU. tiny.en streams live partials
   (~0.4 s/call); small runs the final pass (~2 s for 7 s of speech on an
   i7-5820K). Local hallucination guard + local-agreement prefix commit.
-- **Polish**: optional LLM pass via any OpenAI-compatible endpoint
-  (default: Ollama at 127.0.0.1:11434) that removes fillers, resolves
+- **Polish**: optional LLM pass via local Ollama (`127.0.0.1:11434`,
+  `/api/chat` — see the "Swapping models" section to retarget it) that
+  removes fillers, resolves
   self-corrections, fixes punctuation. Ships raw transcript if the endpoint
   is unreachable or too slow — dictation never blocks on it.
 - **Custom vocabulary**: whisper mis-hears domain words ("GitHub" ->
@@ -114,6 +115,26 @@ right-click menu -> Quit.
 Everything tunable in `config.py`: hotkey, models, mic source, bar sizes
 (in pixels; 96 dpi ≈ 3.78 px/mm if you think in centimetres), session caps,
 polish on/off, paste method.
+
+## Swapping models (transcription & polish)
+
+All model choices live in `config.py` — edit, then restart the app:
+
+- **Transcription** needs no Ollama, no keys, no accounts — the whisper
+  models are pulled automatically and run in-process. Swap them via
+  `PARTIAL_MODEL` (live preview) and `FINAL_MODEL` (final text).
+  Defaults: `tiny.en` + `small` on CPU. Bigger models = more accuracy
+  but slower: a large model on CPU will lag the live preview and make
+  the final pass take longer than a quick dictation.
+- **LLM polish** is optional. `LLM_POLISH = False` turns it off entirely;
+  the app then always pastes the raw transcript. To use different models,
+  set `LLM_POLISH_MODEL` to any model your Ollama already has
+  (e.g. `qwen2.5:1.5b` — fastest local choice; the default `qwen3.5:2b`
+  polishes in ~3 s once warm). `LLM_POLISH_TIMEOUT` (default 5 s) lets a
+  slow endpoint fail over to raw text mid-dictation.
+- The polish endpoint is fixed to local Ollama (`127.0.0.1:11434`) in
+  `engine.py` (the `OLLAMA` constant) — a one-line edit there aims polish
+  at any server speaking the same `/api/chat` shape.
 
 ## Files
 
