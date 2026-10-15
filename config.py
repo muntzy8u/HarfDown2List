@@ -119,3 +119,8 @@ TTS_ENGINE = "piper"
 TTS_PIPER_VOICE = "en_US-amy-medium"
 TTS_PIPER_DATA_DIR = os.path.expanduser("~/.local/state/HarfDown2List/voices")
 TTS_PIPER_RATE = 0    # 0 = read the rate from the voice's .json (≈22050 Hz)
+# Piper delivery shaping — the "articulate" dials:
+TTS_PIPER_SENTENCE_SILENCE = 0.35  # pause between sentences (s) — phrasing
+TTS_PIPER_LENGTH_SCALE = 1.0       # >1 = slower/more deliberate, <1 = brisker
+TTS_PIPER_NOISE_SCALE = 0.70       # intonation expressiveness (piper 0.667)
+TTS_PIPER_NOISE_W_SCALE = 0.90     # phoneme timing variation (piper 0.8)

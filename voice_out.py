@@ -86,8 +86,21 @@ def _piper_pkg():
 def _speak_piper(text, persona=None):
     """Piper synth -> raw PCM piped straight into paplay. No temp files."""
     exe, voice = _piper_pkg()
+    cmd = [exe, "--data-dir", _voice_dir(), "-m", voice, "--output-raw"]
+    length = getattr(config, "TTS_PIPER_LENGTH_SCALE", 1.0)
+    if length and length != 1.0:
+        cmd += ["--length-scale", str(length)]
+    silence = getattr(config, "TTS_PIPER_SENTENCE_SILENCE", 0)
+    if silence and silence > 0:
+        cmd += ["--sentence-silence", str(silence)]
+    noise = getattr(config, "TTS_PIPER_NOISE_SCALE", 0)
+    if noise:
+        cmd += ["--noise-scale", str(noise)]
+    noisew = getattr(config, "TTS_PIPER_NOISE_W_SCALE", 0)
+    if noisew:
+        cmd += ["--noise-w-scale", str(noisew)]
     piper = subprocess.Popen(
-        [exe, "--data-dir", _voice_dir(), "-m", voice, "--output-raw"],
+        cmd,
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL)
     play = subprocess.Popen(

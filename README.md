@@ -145,7 +145,9 @@ All model choices live in `config.py` — edit, then restart the app:
   voice name, e.g. `en_US-lessac-medium`, downloaded to
   `TTS_PIPER_DATA_DIR` on first use) and `TTS_PERSONA` for the cloud
   voices (emma, jenny, michaela, maisie, libby, ryan, sonia, aussie_f,
-  aussie_m, us_f, us_m).
+  aussie_m, us_f, us_m). Delivery is tunable too: `TTS_PIPER_SENTENCE_SILENCE`
+  (sentence pauses), `TTS_PIPER_LENGTH_SCALE` (overall pace) and
+  `TTS_PIPER_NOISE_SCALE` / `TTS_PIPER_NOISE_W_SCALE` (expressiveness).
 
 ## Files
 
