@@ -1,9 +1,9 @@
-"""User-tunable configuration for harfdown2listen."""
+"""User-tunable configuration for HarfDown2List."""
 import os
 
 # --- Branding ---
-APP_NAME = "harfdown2listen"
-APP_TITLE = "harfdown2listen"
+APP_NAME = "HarfDown2List"
+APP_TITLE = "HarfDown2List"
 
 # --- STT models (faster-whisper) ---
 # tiny.en is loaded at startup for live partials (fast, english-only).
@@ -79,7 +79,7 @@ TRANSCRIPT_BAR_H = 30
 TRANSCRIPT_FONT = ("xft:DejaVu Sans:size=10")
 # 0=off 1=errors only 2=status 3=debug
 LOG_LEVEL = 2
-LOG_FILE = os.path.expanduser("~/.local/state/harfdown2listen/hd2l.log")
+LOG_FILE = os.path.expanduser("~/.local/state/HarfDown2List/hd2l.log")
 
 # --- Paste behaviour ---
 # Use xdotool key ctrl+v to paste at the caret; fallback: type text with xdotool.

@@ -4,7 +4,7 @@ Whisper mis-hears domain words ("GitHub" -> "get", "Ollama" -> "a llama").
 This layer applies user-defined replacements AFTER transcription, BEFORE
 pasting — a personal dictionary of known-word corrections.
 
-Edit ~/.local/state/harfdown2listen/vocabulary.json to add your own:
+Edit ~/.local/state/HarfDown2List/vocabulary.json to add your own:
     ["get hub", "GitHub"]
 Word-boundary matching, case-insensitive; runs before the LLM polish pass
 so the polish model sees the corrected terms too.
@@ -14,7 +14,7 @@ import os
 import re
 
 VOCAB_PATH = os.path.expanduser(
-    "~/.local/state/harfdown2listen/vocabulary.json"
+    "~/.local/state/HarfDown2List/vocabulary.json"
 )
 
 # Sensible defaults for the tech-domain user; merged with the user file.
@@ -33,8 +33,8 @@ _DEFAULTS = [
     ["G L M", "GLM"],
     ["j l m", "GLM"],
     ["H D two T T", "HD-2TT-nBA"],
-    ["half down to listen", "harfdown2listen"],
-    ["harf down to listen", "harfdown2listen"],
+    ["half down to listen", "HarfDown2List"],
+    ["harf down to listen", "HarfDown2List"],
 ]
 
 

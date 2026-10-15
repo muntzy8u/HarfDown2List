@@ -1,4 +1,4 @@
-"""harfdown2listen main app: state machine wiring mic, engine, UI, and paste."""
+"""HarfDown2List main app: state machine wiring mic, engine, UI, and paste."""
 import queue
 import select
 import signal
@@ -378,7 +378,7 @@ class App:
                 voice_out.speak_async(sel, config.TTS_PERSONA)
             else:
                 subprocess.Popen(
-                    ["notify-send", "harfdown2listen", "Nothing selected"]
+                    ["notify-send", "HarfDown2List", "Nothing selected"]
                 )
         elif payload == "paste_last":
             if self.last_transcript:
@@ -389,9 +389,9 @@ class App:
         elif payload == "history":
             recs = paste.load_history(5)
             text = "\n".join(r.get("text", "")[:80] for r in reversed(recs)) or "No history yet"
-            subprocess.Popen(["notify-send", "harfdown2listen", text])
+            subprocess.Popen(["notify-send", "HarfDown2List", text])
         elif payload == "mic":
-            subprocess.Popen(["notify-send", "harfdown2listen", "Mic config: edit config.py MIC_SOURCE"])
+            subprocess.Popen(["notify-send", "HarfDown2List", "Mic config: edit config.py MIC_SOURCE"])
         elif payload == "hide":
             self.hide(3600)
         elif payload == "quit":

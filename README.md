@@ -1,4 +1,4 @@
-# harfdown2listen
+# HarfDown2List
 
 Floating-bubble voice dictation for Linux/X11. Press the pill once to listen 
 and then again when you want recording to stop — speech in, clean text out,
@@ -57,7 +57,7 @@ left safely on the clipboard.
   is unreachable or too slow — dictation never blocks on it.
 - **Custom vocabulary**: whisper mis-hears domain words ("GitHub" ->
   "get", "Ollama" -> "a llama"). Your personal dictionary at
-  ~/.local/state/harfdown2listen/vocabulary.json fixes them after
+  ~/.local/state/HarfDown2List/vocabulary.json fixes them after
   transcription, before paste and before polish.
 - **Paste**: xclip + xdotool, terminal-aware (ctrl+shift+v in terminals,
   ctrl+v elsewhere). Your previous clipboard content is restored after.
@@ -129,8 +129,8 @@ polish on/off, paste method.
     paste.py      clipboard paste + no-window guard + history
     requirements.txt       pinned Python dependencies
 
-History: ~/.local/state/harfdown2listen/history.jsonl
-Logs:    ~/.local/state/harfdown2listen/hd2l.log
+History: ~/.local/state/HarfDown2List/history.jsonl
+Logs:    ~/.local/state/HarfDown2List/hd2l.log
 
 ## Status (verified on the dev box, 2026-09-11)
 

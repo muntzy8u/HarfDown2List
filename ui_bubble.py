@@ -1,4 +1,4 @@
-"""Floating bubble + flow bar: the harfdown2listen control surface.
+"""Floating bubble + flow bar: the HarfDown2List control surface.
 
 Collapsed pill (64x40):
   - hold            -> push-to-talk, release to transcribe+paste

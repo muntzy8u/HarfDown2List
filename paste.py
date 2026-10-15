@@ -167,7 +167,7 @@ def paste(text, restore=True, win_id=None):
 import json
 import os
 
-HIST_PATH = os.path.expanduser("~/.local/state/harfdown2listen/history.jsonl")
+HIST_PATH = os.path.expanduser("~/.local/state/HarfDown2List/history.jsonl")
 
 
 def save_history(text, audio_seconds):
