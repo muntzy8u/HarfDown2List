@@ -60,47 +60,28 @@ class App:
         self._hf_silence_s = HANDSFREE_SILENCE_S
         self._hotkey_on = False
 
-    # ---------- hotkey (global PTT key) ----------
-    def _install_hotkey(self):
-        """Global hold-to-talk hotkey: hold F13 (remappable mouse button/key).
+    # ---------- esc cancel (global listener) ----------
+    def _install_esc_cancel(self):
+        """Global Esc listener: cancels an open dictation session anywhere.
 
-        F13 is unbound by default on Linux desktops; map any mouse extra
-        button or key to F13 via xkbset / xdotool / input-remapper, then hold
-        it anywhere to dictate. Double-press quickly = hands-free
-        (window: config.HOTKEY_DOUBLE_PRESS_S).
+        (The old F13 hold-to-talk / double-press hands-free hotkey was scrapped:
+        F13 needs hardware most keyboards don't have. Push-to-talk lives on the
+        pill itself — hold it; click it for the flow bar.)
         """
         from pynput import keyboard
 
-        self._last_f13_down = 0.0
-        self._hf_hotkey_active = False
-
         def on_press(key):
-            if key == keyboard.Key[config.HOTKEY_PTT]:
-                now = time.monotonic()
-                if now - self._last_f13_down < config.HOTKEY_DOUBLE_PRESS_S:
-                    self.toggle_handsfree()
-                    self._hf_hotkey_active = True
-                else:
-                    self.ptt_start()
-                    self._hf_hotkey_active = False
-                self._last_f13_down = now
-            elif key == keyboard.Key.esc:
-                # Esc cancels an open dictation session anywhere
-                if self.state in (FLOWBAR, HANDSFREE, PTT_DOWN):
-                    self._cancel_session()
-                    print("[app] session cancelled via Esc", flush=True)
-
-        def on_release(key):
-            if key == keyboard.Key[config.HOTKEY_PTT]:
-                if not self._hf_hotkey_active:
-                    self.ptt_end()
+            # Esc cancels an open dictation session anywhere
+            if key == keyboard.Key.esc and self.state in (FLOWBAR, HANDSFREE, PTT_DOWN):
+                self._cancel_session()
+                print("[app] session cancelled via Esc", flush=True)
 
         try:
-            listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+            listener = keyboard.Listener(on_press=on_press)
             listener.start()
             self._hotkey_listener = listener
         except Exception as e:
-            print(f"[app] hotkey unavailable: {e}", file=sys.stderr)
+            print(f"[app] esc-cancel unavailable: {e}", file=sys.stderr)
 
     # ---------- layer wiring ----------
     def build(self):
@@ -166,12 +147,6 @@ class App:
         status = "paused — click waveform to resume" if self.bubble.paused else "listening…"
         self.bar.set_text(self.committed, len(self.committed), status)
         print(f"[app] dictation {'paused' if self.bubble.paused else 'resumed'}", flush=True)
-
-    def toggle_handsfree(self):
-        if self.state == HANDSFREE:
-            self._finish_session()
-        elif self.state == IDLE:
-            self._begin_session(HANDSFREE)
 
     def _begin_session(self, new_state):
         with self._final_lock:
@@ -427,8 +402,8 @@ class App:
     def run(self):
         self.build()
         self.mic.start()
-        self._install_hotkey()
-        print("[app] bubble up — hold to talk, click for hands-free", flush=True)
+        self._install_esc_cancel()
+        print("[app] bubble up — click to expand, hold the pill to talk", flush=True)
         d = self.ctx.d
         try:
             while not self._quit.is_set():

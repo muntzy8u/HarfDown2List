@@ -93,12 +93,6 @@ LOG_FILE = os.path.expanduser("~/.local/state/HarfDown2List/hd2l.log")
 # Use xdotool key ctrl+v to paste at the caret; fallback: type text with xdotool.
 PASTE_METHOD = "clipboard"     # "clipboard" | "type"
 TYPE_SPEED_MS = 12            # per-char delay for the "type" fallback
-# Global hold-to-talk hotkey (pynput key name). F13 is unbound on Linux by
-# default — bind a mouse extra-button or any spare key to F13 with
-# input-remapper / xkb / your mouse's driver, then hold it to dictate.
-HOTKEY_PTT = "f13"
-# Double-press the hotkey within this window toggles hands-free mode.
-HOTKEY_DOUBLE_PRESS_S = 0.4
 # If the focused window is one of these wm_class names, skip insertion and show
 # transcript in the bubble menu instead (safety for terminals, etc.)
 NO_PASTE_CLASSES = set()

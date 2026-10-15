@@ -34,7 +34,6 @@ clicked — any app, any monitor, any workspace.
 ### Alternatively
 
     hold the pill    ->  push-to-talk (release to transcribe + paste)
-    double-press F13 ->  hands-free (auto-stops after ~1.6 s of silence)
     drag             ->  reposition; release near a screen edge to snap
     right-click      ->  menu (paste last, history, mic, hide, quit)
     middle-click     ->  recenter the pill
@@ -118,7 +117,7 @@ right-click menu -> Quit.
 
 ## Config
 
-Everything tunable in `config.py`: hotkey, models, mic source, bar sizes
+Everything tunable in `config.py`: models, mic source, bar sizes
 (in pixels; 96 dpi ≈ 3.78 px/mm if you think in centimetres), session caps,
 polish on/off, paste method.
 
@@ -206,8 +205,7 @@ Logs:    ~/.local/state/HarfDown2List/hd2l.log
 - [x] clipboard save/restore; no-window guard (transcript kept on clipboard)
 - [x] transcript history (jsonl)
 - [x] drag + edge snap, multi-monitor clamp
-- [x] global F13 hold-to-talk hotkey (pynput)
-- [ ] hands-free auto-stop: coded, not yet E2E-tested
+- [x] global Esc cancel (pynput)
 - [ ] Wayland: not supported (X11 only)
 
 ## Known behaviour (by design)
