@@ -149,6 +149,32 @@ All model choices live in `config.py` — edit, then restart the app:
   (sentence pauses), `TTS_PIPER_LENGTH_SCALE` (overall pace) and
   `TTS_PIPER_NOISE_SCALE` / `TTS_PIPER_NOISE_W_SCALE` (expressiveness).
 
+## Your own vocabulary
+
+Whisper mis-hears your domain words ("GitHub" -> "get", "Ollama" ->
+"a llama"). Two rule sets merge and apply to every transcript, before
+paste and polish:
+
+- the code defaults — `_DEFAULTS` pairs at the bottom of `vocabulary.py`
+- your personal dictionary: `~/.local/state/HarfDown2List/vocabulary.json`
+  (auto-written on first run)
+
+Rule format — an exact JSON list of pairs:
+
+    [
+      ["phoned me of", "phoneme"],
+      ["get hub", "GitHub"]
+    ]
+
+- Word-boundary matching, case-insensitive; the replacement is inserted
+  verbatim.
+- Prefer phrase-level pairs ("phoned me of" -> "phoneme") over single
+  words — real words ("annotation", "conflict") then survive untouched
+  in other contexts.
+- Your file wins over the defaults for the same misheard key.
+- JSON edits apply on the NEXT dictation — no restart needed. Changing
+  the code defaults does require an app restart.
+
 ## Files
 
     main.py       app wiring + state machine

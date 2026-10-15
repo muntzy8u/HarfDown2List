@@ -440,12 +440,19 @@ class App:
                 if self.state == PROCESSING:
                     self.bubble.paint()
                 select.select([d], [], [], 0.03)
+        except KeyboardInterrupt:
+            pass
         finally:
+            try:
+                if self._hotkey_listener is not None:
+                    self._hotkey_listener.stop()
+            except Exception:
+                pass
             self.mic.stop()
             self.menu.close()
             self.bar.layer.destroy()
             self.bubble.layer.destroy()
-            print("[app] bye", flush=True)
+            print("[app] thanks for using HarfDown2List — bye!", flush=True)
 
     def _dispatch(self, e):
         from Xlib import X

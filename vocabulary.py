@@ -35,6 +35,14 @@ _DEFAULTS = [
     ["H D two T T", "HD-2TT-nBA"],
     ["half down to listen", "HarfDown2List"],
     ["harf down to listen", "HarfDown2List"],
+    # observed mishearings (2026-10-15 dictation sessions) — phrase-level
+    # pairs keep real words like "annotation"/"conflict" safe in other use:
+    ["in conflict", "in config"],
+    ["phoned me of", "phoneme"],
+    ["annotation variation", "intonation variation"],
+    ["commuted code", "committed code"],
+    ["half down to list", "HarfDown2List"],
+    ["harf down to list", "HarfDown2List"],
 ]
 
 
