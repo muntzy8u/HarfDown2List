@@ -1,6 +1,6 @@
 # harfdown2listen
 
-Floating-bubble voice dictation for Linux/X11. Press bubbe once to listen 
+Floating-bubble voice dictation for Linux/X11. Press the pill once to listen 
 and then again when you want recording to stop — speech in, clean text out,
 pasted into the text box of the window you had selected before hitting
 the bubble.
@@ -10,9 +10,10 @@ the bubble.
 ```bash
 git clone https://github.com/muntzy8u/HarfDown2List.git
 cd HarfDown2List
-source venv/bin/activate 
-python main.py
-'''
+python3 -m venv venv
+./venv/bin/pip install -r requirements.txt
+./venv/bin/python main.py
+```
 
 Requires a Linux/X11 session (see Runtime needs below — no Wayland support
 yet). Everything is free and runs locally by default.
@@ -30,7 +31,7 @@ clicked — any app, any monitor, any workspace.
                          session cap and silence-stop suspended while paused)
     Esc (anywhere)   ->  cancel the open session
 
-#ALTERNATIVELY
+### Alternatively
 
     hold the pill    ->  push-to-talk (release to transcribe + paste)
     double-press F13 ->  hands-free (auto-stops after ~1.6 s of silence)
@@ -103,7 +104,7 @@ Python >= 3.13 recommended (developed on 3.13.5).
 
 ## Run
 
-    ./run.sh        # or: ./venv/bin/python main.py
+    ./venv/bin/python main.py
 
 First run warms both models (~15 s) before the pill appears. Kill from the
 right-click menu -> Quit.
@@ -126,13 +127,7 @@ polish on/off, paste method.
     vocabulary.py custom dictionary (post-STT corrections before paste)
     voice_out.py  TTS read-back personas (Michaela = en-US-AriaNeural)
     paste.py      clipboard paste + no-window guard + history
-    POC/          poc_clean_tokenize.py — voice -> clean -> tokenize -> answer
-                  -> speak demo (proof of concept, not used by the app). Runnable:
-                  `./venv/bin/python POC/poc_clean_tokenize.py` (path fix included
-                  so it finds the parent config.py).
-    requirements.txt       pinned Python dependencies (used by setup.sh)
-    setup.sh      one-shot installer for a fresh machine
-    test_ui.sh    xdotool-based UI test driver
+    requirements.txt       pinned Python dependencies
 
 History: ~/.local/state/harfdown2listen/history.jsonl
 Logs:    ~/.local/state/harfdown2listen/hd2l.log
