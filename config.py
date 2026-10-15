@@ -15,14 +15,18 @@ FINAL_MODEL = "small"
 # If True, the final transcript also runs through an LLM "polish" pass
 # (ollama) that removes fillers ("um", "uh", false starts) and resolves
 # self-corrections ("let's meet at 5, actually 6" -> "Let's meet at 6 pm").
-# MEASURED (2026-09-11, via ollama-launch cloud router):
-#   deepseek-v4-flash:cloud + think:false  -> 0.7s  (best)
-#   qwen3.5:cloud + think:false            -> 1.4s
-#   local llama2-uncensored:7b             -> 28.5s (unusable)
-# NOTE: "think": false is REQUIRED for the cloud router models or they
-# reason until the token budget is gone and return empty content.
+# MEASURED (2026-10-15, local Ollama):
+#   qwen3.5:2b   + think:false -> ~3.2s warm; ~11.7s first cold model load
+#                                (first polish after a boot may time out once,
+#                                then the model stays cached and warm)
+#   qwen2.5:1.5b + think:false -> ~1.1s warm, but leaks "Sure, let's clean
+#                                up the voice dictation:" into the text
+#   glm-5.3-flash:cloud        -> ~0.7s (cloud, verified 200; needs the router)
+#   deepseek-v4-flash:cloud    -> RETIRED by the router 2026-09-25 (HTTP 410)
+# NOTE: "think": false is REQUIRED for cloud router models or they reason
+# until the token budget is gone and return empty content; qwen3.5 accepts it.
 LLM_POLISH = True
-LLM_POLISH_MODEL = "deepseek-v4-flash:cloud"
+LLM_POLISH_MODEL = "qwen3.5:2b"
 # Max seconds to wait for the polish LLM. If it exceeds this, raw transcript ships.
 LLM_POLISH_TIMEOUT = 5.0
 

@@ -96,8 +96,8 @@ Python >= 3.13 recommended (developed on 3.13.5).
   partials, final transcription, paste, UI. No API keys, no accounts, no
   telemetry. This is the default configuration.
 - **Optional, only if enabled**: the LLM polish pass calls your own
-  configured endpoint (default localhost Ollama). Point it at a local model
-  and it's free too (a local 7B took ~28 s/dictation on this hardware —
+  configured endpoint (default: local Ollama, model `qwen3.5:2b`). Point it at a
+  local model and it's free too (~3 s/dictation warm on this hardware —
   measured, see config.py). Cloud models are faster but cost whatever your
   provider charges per request; each dictation is one small chat request
   (a few hundred tokens).
