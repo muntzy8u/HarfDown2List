@@ -116,7 +116,7 @@ TTS_PERSONA = "emma"
 TTS_ENGINE = "piper"
 # piper voice (downloaded on first use into TTS_PIPER_DATA_DIR; more at
 # rhasspy/piper-voices: en_US-lessac-medium, en_GB-alba-medium, en_US-joe…):
-TTS_PIPER_VOICE = "en_US-amy-medium"
+TTS_PIPER_VOICE = "en_US-hfc_female-medium"
 TTS_PIPER_DATA_DIR = os.path.expanduser("~/.local/state/HarfDown2List/voices")
 TTS_PIPER_RATE = 0    # 0 = read the rate from the voice's .json (≈22050 Hz)
 # Piper delivery shaping — the "articulate" dials:
