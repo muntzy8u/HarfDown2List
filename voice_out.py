@@ -69,31 +69,33 @@ def _p(key, label, edge, espeak, piper=None, rate="+0%", pitch="+0Hz",
 # en-GB personas only exist in the cloud. The piper column is the LOCAL
 # fallback, so a network outage still leaves a British voice in the room.
 VOICES = {
-    "london": _p("london", "Sonia - classy London (RP)",
+    # the three London voices
+    "london": _p("london", "Sonia - London (classy)",
                  "en-GB-SoniaNeural", "en+rp",
                  "en_GB-jenny_dioco-medium", rate="+9%", pitch="+2Hz"),
-    "london_warm": _p("london_warm", "Libby - warm London",
+    "london_warm": _p("london_warm", "Libby - London (warm)",
                       "en-GB-LibbyNeural", "en+rp",
                       "en_GB-jenny_dioco-medium", rate="+9%", pitch="+2Hz"),
-    "london_bright": _p("london_bright", "Maisie - bright London",
+    "london_bright": _p("london_bright", "Maisie - London (bright)",
                         "en-GB-MaisieNeural", "en+rp",
                         "en_GB-jenny_dioco-medium", rate="+9%", pitch="+3Hz"),
-    "emma": _p("emma", "Emma - friendly US", "en-US-EmmaNeural", "en-us",
+    # the rest, all of them
+    "michaela": _p("michaela", "Aria - US (warm)  [michaela]",
+                   "en-US-AriaNeural", "en-us", "en_US-amy-medium"),
+    "emma": _p("emma", "Emma - US (friendly)", "en-US-EmmaNeural", "en-us",
                "en_US-amy-medium"),
-    "jenny": _p("jenny", "Jenny - clear US", "en-US-JennyNeural", "en-us",
+    "jenny": _p("jenny", "Jenny - US (clear)", "en-US-JennyNeural", "en-us",
                 "en_US-amy-medium"),
-    "michaela": _p("michaela", "Aria - warm US", "en-US-AriaNeural", "en-us",
-                   "en_US-amy-medium"),
-    "ryan": _p("ryan", "Ryan - British", "en-GB-RyanNeural", "en",
+    "aussie_f": _p("aussie_f", "Natasha - Australian",
+                   "en-AU-NatashaNeural", "en", "en_US-amy-medium"),
+    "ryan": _p("ryan", "Ryan - British (male)", "en-GB-RyanNeural", "en",
                "en_GB-northern_english_male-medium"),
-    "aussie_f": _p("aussie_f", "Natasha - Australian", "en-AU-NatashaNeural",
-                   "en", "en_US-amy-medium"),
-    "aussie_m": _p("aussie_m", "William - Australian", "en-AU-WilliamNeural",
-                   "en", "en_US-amy-medium"),
-    "us_f": _p("us_f", "Aria - US", "en-US-AriaNeural", "en-us",
+    "aussie_m": _p("aussie_m", "William - Australian (male)",
+                   "en-AU-WilliamNeural", "en", "en_US-hfc_male-medium"),
+    "us_f": _p("us_f", "Aria - US  [us_f]", "en-US-AriaNeural", "en-us",
                "en_US-amy-medium"),
-    "us_m": _p("us_m", "Guy - US", "en-US-GuyNeural", "en-us",
-               "en_US-amy-medium"),
+    "us_m": _p("us_m", "Guy - US (male)", "en-US-GuyNeural", "en-us",
+               "en_US-hfc_male-medium"),
 }
 
 # Older names still work, so old configs and muscle memory do not break.
@@ -385,9 +387,17 @@ def _piper_voice_for(persona):
         config, "TTS_PIPER_VOICE", "en_US-amy-medium")
     if os.path.exists(os.path.join(_voice_dir(), wanted + ".onnx")):
         return wanted
-    # fall back to whatever British/US voice is actually on disk
-    for alt in (wanted, "en_GB-jenny_dioco-medium", "en_US-amy-medium",
-                "en_US-lessac-medium", "en_US-hfc_female-medium"):
+    # Not on disk: fall back to whatever IS on disk, but never hand a male
+    # persona a female voice (that is how "Ryan" ends up sounding like
+    # Jenny). Match the gender of the cloud voice first.
+    male = any(tag in getattr(persona, "edge", "").lower()
+               for tag in ("ryan", "william", "guy", "thomas", "alan",
+                           "brian", "eric", "roger", "steffan", "chris"))
+    first, second = (("en_US-hfc_male-medium", "en_GB-northern_english_male-medium")
+                     if male else
+                     ("en_GB-jenny_dioco-medium", "en_US-amy-medium"))
+    for alt in (wanted, first, second, "en_US-lessac-medium",
+                "en_US-hfc_female-medium"):
         if os.path.exists(os.path.join(_voice_dir(), alt + ".onnx")):
             return alt
     raise RuntimeError(
@@ -672,6 +682,6 @@ def speak_async(text, persona=None):
 
 def available_personas():
     """[(key, label), ...] in menu order - London voices first."""
-    order = ["london", "london_warm", "london_bright", "emma", "jenny",
-             "michaela", "ryan", "aussie_f", "aussie_m", "us_f", "us_m"]
+    order = ["london", "london_warm", "london_bright", "michaela", "aussie_f",
+             "emma", "jenny", "ryan", "aussie_m", "us_f", "us_m"]
     return [(k, VOICES[k].label) for k in order if k in VOICES]

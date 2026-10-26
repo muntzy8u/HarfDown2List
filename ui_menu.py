@@ -1,10 +1,23 @@
 """Right-click popup menu."""
 from PIL import Image, ImageDraw
 
-from xbase import C_BG, C_BG_ACTIVE, C_FG, XLayer, font, new_canvas, text_size
+from xbase import (
+    C_BG,
+    C_BG_ACTIVE,
+    C_EDGE,
+    C_FG,
+    C_MUTED,
+    XLayer,
+    font,
+    new_canvas,
+    text_size,
+)
 
 
 ROW_H = 26
+# Special row payloads: a hairline separator and a small caption.
+SEP = "__sep__"
+HEADER = "__header__"
 
 
 class Menu:
@@ -57,6 +70,12 @@ class Menu:
         if cb:
             cb()
 
+    def _is_label_row(self, row):
+        """True for a row that can be picked (not a separator/header)."""
+        if not (0 <= row < len(self.items)):
+            return False
+        return self.items[row][1] not in (SEP, HEADER)
+
     def _row_at(self, local_y):
         return (local_y - 4) // ROW_H
 
@@ -69,7 +88,7 @@ class Menu:
         t = e.type
         if t == X.MotionNotify:
             row = self._row_at(e.event_y)
-            if 0 <= row < len(self.items):
+            if self._is_label_row(row):
                 if row != self.hover:
                     self.hover = row
                     self._repaint()
@@ -80,11 +99,13 @@ class Menu:
         if t == X.ButtonPress:
             if e.detail == 1:
                 row = self._row_at(e.event_y)
-                if 0 <= row < len(self.items):
+                if self._is_label_row(row):
                     payload = self.items[row][1]
                     self.close()
                     self.on_select(payload)
                     return "selected"
+                if 0 <= row < len(self.items):
+                    return "consumed"
             self.close()
             return "consumed"
         if t == X.Expose:
@@ -97,8 +118,16 @@ class Menu:
         w, h = self.layer.w, self.layer.h
         img, d = new_canvas(w, h, bg=C_BG)
         d.rounded_rectangle([0, 0, w - 1, h - 1], radius=10, fill=C_BG)
-        for i, (label, _) in enumerate(self.items):
+        for i, (label, payload) in enumerate(self.items):
             ty = 4 + i * ROW_H
+            if payload == SEP:
+                d.line([(10, ty + ROW_H // 2), (w - 10, ty + ROW_H // 2)],
+                       fill=C_EDGE, width=1)
+                continue
+            if payload == HEADER:
+                d.text((14, ty + 7), label, font=font(10, bold=True),
+                       fill=C_MUTED)
+                continue
             if i == self.hover:
                 d.rounded_rectangle([4, ty, w - 5, ty + ROW_H - 2], radius=6, fill=C_BG_ACTIVE)
             d.text((14, ty + 6), label, font=f, fill=C_FG)

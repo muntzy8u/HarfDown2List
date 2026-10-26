@@ -346,15 +346,12 @@ class App:
         # always says what the click will do.
         if voice_out.is_paused():
             pause_label = "Resume reading"
-        elif voice_out.current() is not None:
-            pause_label = "Pause reading"
         else:
-            pause_label = "Pause reading (nothing playing)"
+            pause_label = "Pause reading"
         items = [
             ("Read selection aloud", "speak_selection"),
             ("Read selection anyway", "speak_selection_anyway"),
             ("Speak last transcript", "speak_last"),
-            ("Voice: %s" % persona.label, "voice"),
             (pause_label, "toggle_pause"),
             ("Stop speaking", "stop_speaking"),
             ("Paste last transcript", "paste_last"),
@@ -362,7 +359,14 @@ class App:
             ("Mic: default", "mic"),
             ("Hide 1 hour", "hide"),
             ("Quit", "quit"),
+            ("__sep__", "__sep__"),
+            ("VOICES", "__header__"),
         ]
+        # Every voice is its own row, so you pick one instead of guessing
+        # what a cycling item will do next. The current one is marked.
+        for key, label in voice_out.available_personas():
+            mark = "* " if key == persona.key else "  "
+            items.append((mark + label, "voice:" + key))
         self.menu.open(
             bx + 6,
             by - len(items) * 26 - 12,
@@ -414,21 +418,14 @@ class App:
         elif payload == "speak_selection_anyway":
             threading.Thread(target=self._read_selection,
                              kwargs={"anyway": True}, daemon=True).start()
-        elif payload == "voice":
-            # Cycle to the next voice and say a little of it, so the choice
-            # can be made by ear instead of by editing config.py. The cycle
-            # is short (the London voices) so the way back is one click.
-            order = [k for k in getattr(config, "TTS_PERSONA_CYCLE",
-                                        ["london", "london_warm",
-                                         "london_bright"])
-                     if k in voice_out.VOICES]
-            if not order:
-                order = [k for k, _ in voice_out.available_personas()]
-            cur = voice_out.persona_for().key
-            nxt = order[(order.index(cur) + 1) % len(order)] if cur in order \
-                else order[0]
-            voice_out.set_persona(nxt)
-            persona = voice_out.persona_for()
+        elif payload.startswith("voice:"):
+            # Every voice is listed in the menu: pick one, hear it, keep it
+            # if you like it. The choice is remembered for next time.
+            key = payload.split(":", 1)[1]
+            persona = voice_out.set_persona(key)
+            if persona is None:
+                notify.notify("HarfDown2List", "Unknown voice.")
+                return
             notify.notify("HarfDown2List", "Voice: %s" % persona.label)
             print(f"[app] voice -> {persona.key} ({persona.label})", flush=True)
             voice_out.speak_async(
