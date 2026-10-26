@@ -11,6 +11,8 @@ import numpy as np
 
 import config
 import engine
+import logs
+import notify
 import paste
 import vocabulary
 import voice_out
@@ -71,8 +73,13 @@ class App:
         from pynput import keyboard
 
         def on_press(key):
-            # Esc cancels an open dictation session anywhere
-            if key == keyboard.Key.esc and self.state in (FLOWBAR, HANDSFREE, PTT_DOWN):
+            if key != keyboard.Key.esc:
+                return
+            # Esc always stops whatever is being spoken aloud.
+            if voice_out.stop():
+                print("[app] speech stopped via Esc", flush=True)
+            # ...and cancels an open dictation session anywhere
+            if self.state in (FLOWBAR, HANDSFREE, PTT_DOWN):
                 self._cancel_session()
                 print("[app] session cancelled via Esc", flush=True)
 
@@ -87,6 +94,11 @@ class App:
     def build(self):
         from xbase import XLayer
         import config as cfg
+
+        # Watch the X selection from the start: the read-back needs to know
+        # when the selection last changed, and a watcher that only starts
+        # when the menu is opened has no history to compare against.
+        paste.watch_selection()
 
         layer = XLayer(self.ctx, 0, 0, cfg.BUBBLE_W, cfg.BUBBLE_H)
         # collapsed idle button is a true circle (visible + input shape)
@@ -222,7 +234,7 @@ class App:
                 paste.save_history(text, dur)
                 self.last_transcript = text
                 if config.TTS_ENABLED:
-                    voice_out.speak_async(text, config.TTS_PERSONA)
+                    voice_out.speak_async(text)
             self._settle(ok and text != "")
 
         t = threading.Thread(target=work, daemon=True)
@@ -329,10 +341,23 @@ class App:
             self.menu.close()
             return
         bx, by = self.bubble.pos
+        persona = voice_out.persona_for()
+        # The pause item changes its name with the state, so the menu
+        # always says what the click will do.
+        if voice_out.is_paused():
+            pause_label = "Resume reading"
+        elif voice_out.current() is not None:
+            pause_label = "Pause reading"
+        else:
+            pause_label = "Pause reading (nothing playing)"
         items = [
             ("Read selection aloud", "speak_selection"),
-            ("Paste last transcript", "paste_last"),
+            ("Read selection anyway", "speak_selection_anyway"),
             ("Speak last transcript", "speak_last"),
+            ("Voice: %s" % persona.label, "voice"),
+            (pause_label, "toggle_pause"),
+            ("Stop speaking", "stop_speaking"),
+            ("Paste last transcript", "paste_last"),
             ("History", "history"),
             ("Mic: default", "mic"),
             ("Hide 1 hour", "hide"),
@@ -346,38 +371,93 @@ class App:
             on_close=None,
         )
 
+    def _read_selection(self, anyway=False):
+        """Read the current selection aloud.
+
+        Freshness comes from the selection owner itself (the ICCCM
+        TIMESTAMP), so this is the text the user just highlighted - not a
+        stale highlight the watcher happened to see, and not a refusal
+        because the watcher missed a change.
+        """
+        state = paste.selection_state()
+        sel = state["text"]
+        age = state["age"]
+        if not sel:
+            notify.notify("HarfDown2List",
+                          "Nothing is selected — highlight some text "
+                          "first, then try again")
+            print("[app] read-selection: nothing selected", flush=True)
+            return
+        preview = " ".join(sel.split())[:70]
+        if anyway or state["fresh"]:
+            notify.notify("HarfDown2List", f"Reading: {preview}…")
+            print(f"[app] read-selection: {len(sel)} chars "
+                  f"(age {age if age is None else round(age, 1)}s)",
+                  flush=True)
+            voice_out.speak_async(sel)
+        else:
+            when = "a while ago" if age is None else \
+                "%d min ago" % max(1, int(age // 60))
+            notify.notify(
+                "HarfDown2List",
+                "That highlight is %s. Use 'Read selection anyway' to "
+                "hear it." % when)
+            print(f"[app] read-selection: stale ({when})", flush=True)
+
     def menu_select(self, payload):
         print(f"[dbg] menu_select: {payload!r}", flush=True)
         if payload == "speak_selection":
-            # Read the CURRENT highlight aloud. PRIMARY never empties on
-            # X11, so a one-off read serves stale junk (the URL bug); a
-            # background watcher timestamps every PRIMARY change instead,
-            # and only a highlight made in the last few seconds is spoken.
-            sel = paste.recent_selection(
-                getattr(config, "SELECTION_MAX_AGE_S", 8.0))
-            print(f"[app] read-selection: got {len(sel) if sel else 0} chars", flush=True)
-            if sel:
-                preview = " ".join(sel.split())[:60]
-                subprocess.Popen(["notify-send", "HarfDown2List",
-                                  f"Reading: {preview}…"])
-                voice_out.speak_async(sel, config.TTS_PERSONA)
+            # Off the UI thread: reading the selection can take a moment
+            # when ownership is changing hands, and the event loop must
+            # keep breathing.
+            threading.Thread(target=self._read_selection, daemon=True).start()
+        elif payload == "speak_selection_anyway":
+            threading.Thread(target=self._read_selection,
+                             kwargs={"anyway": True}, daemon=True).start()
+        elif payload == "voice":
+            # Cycle to the next voice and say a little of it, so the choice
+            # can be made by ear instead of by editing config.py. The cycle
+            # is short (the London voices) so the way back is one click.
+            order = [k for k in getattr(config, "TTS_PERSONA_CYCLE",
+                                        ["london", "london_warm",
+                                         "london_bright"])
+                     if k in voice_out.VOICES]
+            if not order:
+                order = [k for k, _ in voice_out.available_personas()]
+            cur = voice_out.persona_for().key
+            nxt = order[(order.index(cur) + 1) % len(order)] if cur in order \
+                else order[0]
+            voice_out.set_persona(nxt)
+            persona = voice_out.persona_for()
+            notify.notify("HarfDown2List", "Voice: %s" % persona.label)
+            print(f"[app] voice -> {persona.key} ({persona.label})", flush=True)
+            voice_out.speak_async(
+                "Good evening. This is your reading voice, speaking from "
+                "London.")
+        elif payload == "toggle_pause":
+            state = voice_out.toggle_pause()
+            if state == "paused":
+                notify.notify("HarfDown2List", "Paused.")
+            elif state == "resumed":
+                notify.notify("HarfDown2List", "Resumed.")
             else:
-                subprocess.Popen(
-                    ["notify-send", "HarfDown2List",
-                     "Nothing selected — highlight text, then try again"]
-                )
+                notify.notify("HarfDown2List", "Nothing is being read.")
+        elif payload == "stop_speaking":
+            if voice_out.stop():
+                notify.notify("HarfDown2List", "Stopped.")
         elif payload == "paste_last":
             if self.last_transcript:
                 paste.paste(self.last_transcript)
         elif payload == "speak_last":
             if self.last_transcript:
-                voice_out.speak_async(self.last_transcript, config.TTS_PERSONA)
+                voice_out.speak_async(self.last_transcript)
         elif payload == "history":
             recs = paste.load_history(5)
             text = "\n".join(r.get("text", "")[:80] for r in reversed(recs)) or "No history yet"
-            subprocess.Popen(["notify-send", "HarfDown2List", text])
+            notify.notify("HarfDown2List", text)
         elif payload == "mic":
-            subprocess.Popen(["notify-send", "HarfDown2List", "Mic config: edit config.py MIC_SOURCE"])
+            notify.notify("HarfDown2List",
+                          "Mic config: edit config.py MIC_SOURCE")
         elif payload == "hide":
             self.hide(3600)
         elif payload == "quit":
@@ -466,6 +546,9 @@ class App:
 
 
 def main():
+    logs.setup()
+    log = logs.get_logger("app")
+    log.info("HarfDown2List starting")
     App().run()
 
 

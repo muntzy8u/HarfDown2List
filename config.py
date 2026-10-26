@@ -97,30 +97,42 @@ NO_PASTE_CLASSES = set()
 # After pasting, restore the clipboard to the user's previous content.
 RESTORE_CLIPBOARD = True
 RESTORE_CLIPBOARD_DELAY_S = 0.3
-# "Read selection aloud" speaks the PRIMARY selection only if it changed
-# within this many seconds (a background watcher timestamps every change).
-# Guards against reading ancient highlights; raise if the menu feels rushed.
-SELECTION_MAX_AGE_S = 8.0
+# --- Selection read-back ---
+# "Read selection aloud" asks the X selection owner WHEN it last changed
+# (the ICCCM TIMESTAMP target) and only reads a selection that young.
+# The old 8 s window was measured against a background poller, so a
+# selection made a moment ago often looked stale and nothing was read.
+SELECTION_MAX_AGE_S = 120.0     # 2 min: comfortably covers menu clicks
+# How often the watcher asks the owner for its timestamp.
+SELECTION_POLL_S = 0.4
+# Timeout for one content read. Reads can stall while selection ownership
+# changes hands; give them room instead of giving up mid-flight.
+SELECTION_READ_TIMEOUT_S = 3.0
 
 # --- TTS (voice read-back of transcripts / answers) ---
-# Voice personas in voice_out.py: emma, jenny, michaela, maisie, libby, ryan,
-# sonia, aussie_f, aussie_m, us_f, us_m.
-# emma = en-US-EmmaNeural (cheerful, friendly US female — default)
-# maisie = young en-GB female; libby = en-GB friendly; natasha = en-AU.
+# Personas live in voice_out.py. London voices:
+#   london        = Sonia (en-GB, RP)  - poised, broadcaster, the default
+#   london_warm   = Libby (en-GB, RP)  - warmer, closer
+#   london_bright = Maisie (en-GB, RP) - younger, livelier
+# Also: emma, jenny, michaela (US), ryan (GB male), aussie_f/aussie_m (AU).
 TTS_ENABLED = False          # speak the final transcript after pasting
-# British female personas (edge-tts): sonia (RP), libby (friendly), maisie
-# (young, bubbly). US fallbacks: emma, jenny, michaela(=Aria). TTS_ENGINE
-# decides which engine actually speaks — the British voices only exist on
-# edge-tts.
-TTS_PERSONA = "maisie"
+# The requested voice. The menu can switch it at runtime; the choice is
+# remembered in ~/.local/state/HarfDown2List/voice.json.
+TTS_PERSONA = "london"
+# The voices the menu cycles through, in order. Kept short so the way back
+# to the first one is a single click. Add more keys to widen the cycle.
+TTS_PERSONA_CYCLE = ["london", "london_warm", "london_bright"]
 # Engine order for actually making sound: "edge" (Microsoft cloud via
-# edge-tts; the British personas live here — needs network, 403s when MS
-# rotates its handshake token) or "piper" (local neural TTS, offline, US
-# voices only — streams straight into paplay, no audio files).
+# edge-tts; the British personas live here - needs network, 403s when MS
+# rotates its handshake token) or "piper" (local neural TTS, offline -
+# streams straight into paplay, no audio files).
 TTS_ENGINE = "edge"
-# piper voice (downloaded on first use into TTS_PIPER_DATA_DIR; more at
-# rhasspy/piper-voices: en_US-lessac-medium, en_GB-alba-medium, en_US-joe…):
-TTS_PIPER_VOICE = "en_US-hfc_female-medium"
+# Hard cap on one utterance. A player that overruns is killed, so nothing
+# can sit on the audio device and wedge the machine.
+TTS_MAX_SECONDS = 300.0
+# Local piper voice used when the cloud voice is unreachable. It should be
+# British too, so a network outage does not swap the accent.
+TTS_PIPER_VOICE = "en_GB-jenny_dioco-medium"
 TTS_PIPER_DATA_DIR = os.path.expanduser("~/.local/state/HarfDown2List/voices")
 TTS_PIPER_RATE = 0    # 0 = read the rate from the voice's .json (≈22050 Hz)
 # Piper delivery shaping — the "articulate" dials:

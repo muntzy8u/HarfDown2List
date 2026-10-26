@@ -61,12 +61,23 @@ left safely on the clipboard.
   transcription, before paste and before polish.
 - **Paste**: xclip + xdotool, terminal-aware (ctrl+shift+v in terminals,
   ctrl+v elsewhere). Your previous clipboard content is restored after.
-- **Voice read-out**: optional, off by default (`TTS_ENABLED`). Piper (local
-  neural TTS) speaks it: clear voice, fully offline, streams straight into
-  `paplay` — no audio files are created. Fallback chain: edge-tts (Microsoft
-  cloud; it 403s whenever MS rotates its handshake token) then espeak-ng.
+- **Voice read-out**: optional for transcripts (`TTS_ENABLED`), always
+  available for the right-click menu. edge-tts (Microsoft cloud) speaks
+  first, because the British voices live there; piper (local neural TTS,
+  fully offline) is the fallback, then espeak-ng. Every utterance is
+  supervised: it runs under a watchdog, is killed if it overruns, its temp
+  files are removed, and a new read-back always stops the one before it —
+  so voices can never pile up on top of each other. The right-click menu
+  can switch voice, pause and resume a read-back, and stop it (Esc works
+  too). If the requested cloud voice is unavailable the app says so
+  instead of quietly reading in a different accent.
   The voice only reads what the model has already generated — a delivery
   layer, not an agent.
+- **Read the selection aloud**: the app asks the X selection owner (the
+  ICCCM `TIMESTAMP` target) when the selection last changed, and reads
+  what you highlighted — not an old highlight from yesterday, and not a
+  refusal because a poller missed the change. "Read selection anyway"
+  ignores the freshness check.
 
 ## Requirements
 
@@ -140,14 +151,26 @@ All model choices live in `config.py` — edit, then restart the app:
 - The polish endpoint is fixed to local Ollama (`127.0.0.1:11434`) in
   `engine.py` (the `OLLAMA` constant) — a one-line edit there aims polish
   at any server speaking the same `/api/chat` shape.
-- **Voice**: engine and voices are `config.py` switches too — `TTS_ENGINE`
-  (`piper` local default / `edge` cloud), `TTS_PIPER_VOICE` (any piper
-  voice name, e.g. `en_US-lessac-medium`, downloaded to
-  `TTS_PIPER_DATA_DIR` on first use) and `TTS_PERSONA` for the cloud
-  voices (emma, jenny, michaela, maisie, libby, ryan, sonia, aussie_f,
-  aussie_m, us_f, us_m). Delivery is tunable too: `TTS_PIPER_SENTENCE_SILENCE`
-  (sentence pauses), `TTS_PIPER_LENGTH_SCALE` (overall pace) and
-  `TTS_PIPER_NOISE_SCALE` / `TTS_PIPER_NOISE_W_SCALE` (expressiveness).
+- **Voice**: `TTS_PERSONA` picks the voice (default `london` = Sonia,
+  en-GB RP), `TTS_PERSONA_CYCLE` is the short list the right-click menu
+  cycles through (`london`, `london_warm`, `london_bright` — one click
+  back to the first), and the menu remembers your choice in
+  `~/.local/state/HarfDown2List/voice.json`. Other personas exist for
+  reference: `emma`, `jenny`, `michaela`, `ryan`, `aussie_f`, `aussie_m`,
+  `us_f`, `us_m`. `TTS_ENGINE` chooses the engine order (`edge` cloud
+  first, or `piper` local first), `TTS_PIPER_VOICE` is the offline voice
+  (a British one, so a network outage does not change your accent),
+  `TTS_MAX_SECONDS` is the watchdog that kills a runaway read-back, and
+  `TTS_PIPER_SENTENCE_SILENCE` / `TTS_PIPER_LENGTH_SCALE` /
+  `TTS_PIPER_NOISE_SCALE` / `TTS_PIPER_NOISE_W_SCALE` shape the local
+  delivery. The per-persona `rate` / `pitch` live in `voice_out.py`.
+- **Selection read-back**: `SELECTION_MAX_AGE_S` (default 120 s) is how
+  old a highlight may be before the app asks before reading it,
+  `SELECTION_POLL_S` is how often the owner is asked for its timestamp,
+  and `SELECTION_READ_TIMEOUT_S` is the patience of one selection read.
+- **Logs**: everything now goes to `~/.local/state/HarfDown2List/hd2l.log`
+  (rotating) as well as the terminal — that file is the first place to
+  look when a read-back misbehaves.
 
 ## Your own vocabulary
 
@@ -185,7 +208,9 @@ Rule format — an exact JSON list of pairs:
     audio.py      mic capture, level metering, silence trim, pause
     engine.py     partial/final transcription + LLM polish
     vocabulary.py custom dictionary (post-STT corrections before paste)
-    voice_out.py  TTS engines (piper local -> edge-tts -> espeak) + personas
+    voice_out.py  TTS engines (edge-tts -> piper -> espeak) + personas
+    logs.py       rotating log file (config.LOG_FILE) + stdout mirror
+    notify.py     desktop notifications, reaped (no zombie notify-send)
     paste.py      clipboard paste + no-window guard + history
     assets/gen_idle_icon.py generates assets/idle-mic.png (design dials inside)
     assets/idle-mic.png    idle mic icon shown on the pill (config.BUBBLE_ICON)
