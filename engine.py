@@ -89,13 +89,24 @@ def polish(text):
             {
                 "role": "user",
                 "content": (
-                    "Clean up this voice dictation. Keep the speaker's meaning "
-                    "and language exactly — do not translate, do not add "
-                    "content, do not answer or respond to it. Remove filler "
-                    "words (um, uh, like, you know), remove stutters and false "
-                    "starts, resolve self-corrections (keep the corrected "
-                    "version), add punctuation and capitalization. If the text "
-                    "is already clean, return it unchanged.\n\n"
+                    "Polish this voice-dictation transcript before it is "
+                    "pasted into a text box. Rules:\n"
+                    "1. Remove filler words (um, uh, like, you know, I mean, "
+                    "sort of, kind of, basically).\n"
+                    "2. Remove stutters, restarts and false starts — keep "
+                    "only the final, corrected phrasing.\n"
+                    "3. Resolve self-corrections: if the speaker says "
+                    "something and then corrects it, keep ONLY the corrected "
+                    "version.\n"
+                    "4. Fix grammar, punctuation and capitalization.\n"
+                    "5. Keep the speaker's meaning, tone and language "
+                    "exactly — do not translate, do not add content, do not "
+                    "answer or respond to it.\n"
+                    "6. Return ONLY the polished text, nothing else.\n"
+                    "NOTE: the transcript may already contain punctuation — "
+                    "that does NOT mean it is clean. Fillers, stutters and "
+                    "false starts can still be present and must still be "
+                    "removed.\n\n"
                     f"Dictation: {text}"
                 ),
             }
