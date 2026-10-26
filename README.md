@@ -151,6 +151,10 @@ All model choices live in `config.py` — edit, then restart the app:
 - The polish endpoint is fixed to local Ollama (`127.0.0.1:11434`) in
   `engine.py` (the `OLLAMA` constant) — a one-line edit there aims polish
   at any server speaking the same `/api/chat` shape.
+- **Natural delivery**: long text is synthesized sentence by sentence (in
+  parallel, so it starts no later) and the pieces are joined, so every
+  sentence gets its own phrase ending and a breath between instead of one
+  flat run. Turn it off with `TTS_SENTENCE_SPLIT = False`.
 - **Voice**: `TTS_PERSONA` picks the voice (default `london` = Sonia,
   en-GB RP), `TTS_PERSONA_CYCLE` is the short list the right-click menu
   cycles through (`london`, `london_warm`, `london_bright` — one click

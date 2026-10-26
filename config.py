@@ -130,6 +130,11 @@ TTS_ENGINE = "edge"
 # Hard cap on one utterance. A player that overruns is killed, so nothing
 # can sit on the audio device and wedge the machine.
 TTS_MAX_SECONDS = 300.0
+# Synthesise long text sentence by sentence (in parallel) and join the
+# pieces. Each sentence then gets its own phrase ending and a breath
+# between, instead of one long flat run. False = one request for
+# everything, which is faster to start but reads like a list.
+TTS_SENTENCE_SPLIT = True
 # Local piper voice used when the cloud voice is unreachable. It should be
 # British too, so a network outage does not swap the accent.
 TTS_PIPER_VOICE = "en_GB-jenny_dioco-medium"

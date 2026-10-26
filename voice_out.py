@@ -22,12 +22,14 @@ user is told rather than being handed a different accent in silence.
 import atexit
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
 import tempfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import config
 import logs
@@ -69,13 +71,13 @@ def _p(key, label, edge, espeak, piper=None, rate="+0%", pitch="+0Hz",
 VOICES = {
     "london": _p("london", "Sonia - classy London (RP)",
                  "en-GB-SoniaNeural", "en+rp",
-                 "en_GB-jenny_dioco-medium", rate="+5%", pitch="+0Hz"),
+                 "en_GB-jenny_dioco-medium", rate="+9%", pitch="+2Hz"),
     "london_warm": _p("london_warm", "Libby - warm London",
                       "en-GB-LibbyNeural", "en+rp",
-                      "en_GB-jenny_dioco-medium", rate="+5%", pitch="+2Hz"),
+                      "en_GB-jenny_dioco-medium", rate="+9%", pitch="+2Hz"),
     "london_bright": _p("london_bright", "Maisie - bright London",
                         "en-GB-MaisieNeural", "en+rp",
-                        "en_GB-jenny_dioco-medium", rate="+5%", pitch="+3Hz"),
+                        "en_GB-jenny_dioco-medium", rate="+9%", pitch="+3Hz"),
     "emma": _p("emma", "Emma - friendly US", "en-US-EmmaNeural", "en-us",
                "en_US-amy-medium"),
     "jenny": _p("jenny", "Jenny - clear US", "en-US-JennyNeural", "en-us",
@@ -460,6 +462,112 @@ def _speak_piper(text, persona):
     return utt
 
 
+# Abbreviations that must not end a sentence.
+_ABBREV = re.compile(
+    r"(?:^|\s)(mr|mrs|ms|dr|prof|sr|jr|st|vs|etc|e\.g|i\.e|approx|"
+    r"no|fig|vol|ch|pp|ed|inc|ltd|co|jr|sr)\.\s*$", re.I)
+
+
+def _split_sentences(text, max_len=320):
+    """Split text into sentence-ish chunks.
+
+    Long text read in one request comes out as one long, flat run - the
+    voice never gets to breathe at a sentence end. Synthesising each
+    sentence separately gives every one its own phrase-final contour and
+    a natural pause between, which is most of what "sounds natural"
+    actually means.
+    """
+    if not getattr(config, "TTS_SENTENCE_SPLIT", True):
+        return [text]
+    parts = re.split(r"(?<=[.!?…])\s+", text.strip())
+    out = []
+    for part in parts:
+        if not part:
+            continue
+        if out and _ABBREV.search(out[-1]):
+            out[-1] = out[-1] + " " + part
+            continue
+        if len(part) > max_len:
+            # a "sentence" with no punctuation in it: break on commas
+            bits = re.split(r"(?<=[,;:])\s+", part)
+            buf = ""
+            for bit in bits:
+                if buf and len(buf) + len(bit) + 1 > max_len:
+                    out.append(buf)
+                    buf = bit
+                else:
+                    buf = (buf + " " + bit).strip()
+            if buf:
+                out.append(buf)
+            continue
+        out.append(part)
+    return out or [text]
+
+
+def _edge_cli(persona, text, out_path, timeout=90):
+    """One edge-tts synthesis -> one file. Raises on failure."""
+    exe = _venv_bin("edge-tts")
+    if not os.path.exists(exe):
+        exe = shutil.which("edge-tts")
+        if not exe:
+            raise FileNotFoundError("edge-tts not installed")
+    cmd = [exe, "--voice", persona.edge,
+           "--rate=%s" % persona.rate, "--pitch=%s" % persona.pitch,
+           "--volume=%s" % persona.volume,
+           "--no-progress", "--write-media", out_path]
+    if len(text) > 4000:
+        textfile = out_path + ".txt"
+        with open(textfile, "w", encoding="utf-8") as f:
+            f.write(text)
+        cmd += ["--file", textfile]
+    else:
+        cmd += ["--text", text]
+    r = subprocess.run(cmd, capture_output=True, timeout=timeout, check=False)
+    if r.returncode != 0 or not os.path.exists(out_path) \
+            or os.path.getsize(out_path) < 512:
+        err = (r.stderr or b"").decode("utf-8", "replace").strip()[-200:]
+        raise RuntimeError("edge-tts failed (%s): %s" % (r.returncode, err))
+
+
+def _synth_edge(text, persona, tmpdir, clip):
+    """Synthesize `text` with edge-tts into `clip`.
+
+    Multi-sentence text is synthesized sentence by sentence - in
+    parallel, so the wait is no longer than one big request - and the
+    results are joined. Each sentence then gets its own natural
+    phrase ending and a breath between. If any part fails, the whole
+    thing is synthesized in one request instead, so a flaky network
+    never costs you the read-back.
+    """
+    chunks = _split_sentences(text)
+    if len(chunks) < 2:
+        _edge_cli(persona, text, clip)
+        return
+    workers = min(4, len(chunks))
+    paths = []
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = []
+            for i, chunk in enumerate(chunks):
+                p = os.path.join(tmpdir, "part%03d.mp3" % i)
+                futures.append((p, ex.submit(_edge_cli, persona, chunk, p)))
+            for p, fut in futures:
+                fut.result()
+                paths.append(p)
+        with open(clip, "wb") as out:
+            for p in paths:
+                with open(p, "rb") as fh:
+                    out.write(fh.read())
+    except Exception as e:
+        log.warning("sentence-wise synthesis failed (%s); one request", e)
+        for p in paths:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+        _edge_cli(persona, text, clip)
+
+
 def _speak_edge(text, persona):
     """edge-tts -> temp clip -> paplay.
 
@@ -474,34 +582,14 @@ def _speak_edge(text, persona):
             raise FileNotFoundError("edge-tts not installed")
     tmpdir = tempfile.mkdtemp(prefix="hd2l-tts-")
     clip = os.path.join(tmpdir, "speech.mp3")
-    # The delivery knobs use the --opt=value form on purpose: argparse
-    # reads a bare "-3%" as another option, not as the value of --rate.
-    cmd = [exe, "--voice", persona.edge,
-           "--rate=%s" % persona.rate, "--pitch=%s" % persona.pitch,
-           "--volume=%s" % persona.volume,
-           "--no-progress", "--write-media", clip]
-    # long text on the command line can blow past ARG_MAX -> use a file
-    if len(text) > 4000:
-        textfile = os.path.join(tmpdir, "text.txt")
-        with open(textfile, "w", encoding="utf-8") as f:
-            f.write(text)
-        cmd += ["--file", textfile]
-    else:
-        cmd += ["--text", text]
-
     def cleanup():
         shutil.rmtree(tmpdir, ignore_errors=True)
 
     try:
-        r = subprocess.run(cmd, capture_output=True, timeout=90, check=False)
-    except subprocess.TimeoutExpired:
+        _synth_edge(text, persona, tmpdir, clip)
+    except Exception:
         cleanup()
-        raise RuntimeError("edge-tts timed out")
-    if r.returncode != 0 or not os.path.exists(clip) \
-            or os.path.getsize(clip) < 512:
-        err = (r.stderr or b"").decode("utf-8", "replace").strip()[-200:]
-        cleanup()
-        raise RuntimeError("edge-tts failed (%s): %s" % (r.returncode, err))
+        raise
     play = subprocess.Popen(["paplay", clip], stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL)
     utt = Utterance([play], primary=play, cleanup=cleanup)
