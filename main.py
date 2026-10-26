@@ -349,11 +349,11 @@ class App:
     def menu_select(self, payload):
         print(f"[dbg] menu_select: {payload!r}", flush=True)
         if payload == "speak_selection":
-            # Read whatever the user highlighted (PRIMARY selection) aloud —
-            # e.g. the model's reply in a terminal. Falls back to the
-            # clipboard when PRIMARY is stale/empty, and previews exactly
-            # what will be spoken so "random shit" can't sneak through.
-            sel = paste.get_selection_any()
+            # Read the CURRENT highlight aloud. PRIMARY goes stale (X11 keeps
+            # the last highlight forever), so grab fresh: ctrl+c into the
+            # focused window, read the clipboard, restore it. No fresh
+            # highlight = say so, never read stale junk.
+            sel = paste.grab_selection_fresh()
             print(f"[app] read-selection: got {len(sel) if sel else 0} chars", flush=True)
             if sel:
                 preview = " ".join(sel.split())[:60]

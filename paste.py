@@ -45,10 +45,9 @@ def get_selection(timeout=0.5):
 def get_selection_any(timeout=0.5):
     """PRIMARY first (last highlighted), then CLIPBOARD (last copied).
 
-    PRIMARY goes stale — it keeps whatever was highlighted ages ago — so a
-    "read selection" click can read ancient junk. Falling back to the
-    clipboard plus a preview notification (see main.py) keeps the user in
-    control of what gets spoken.
+    NOTE: PRIMARY never goes empty — X11 keeps the last highlight forever —
+    so this can return ancient text. For "read selection" use
+    grab_selection_fresh() instead, which copies the CURRENT highlight.
     """
     sel = get_selection(timeout)
     if sel:
@@ -60,6 +59,37 @@ def get_selection_any(timeout=0.5):
     except Exception:
         pass
     return None
+
+
+def grab_selection_fresh(timeout=1.0):
+    """Copy the CURRENT highlight to the clipboard and return it.
+
+    Reading PRIMARY directly is useless for "read selection": it never
+    empties, so it keeps serving whatever was highlighted ages ago (the
+    stale-URL bug). Instead: remember the old clipboard, send ctrl+c to
+    the focused window (our overlays never take focus, so this is the app
+    the user is reading in; terminals get ctrl+shift+c), read the
+    clipboard, then ALWAYS put the user's clipboard back. If the clipboard
+    never changed, nothing was highlighted -> None. Never falls back to
+    stale sources: no fresh highlight means "nothing selected".
+    """
+    prev = get_clipboard(timeout)
+    cls = focused_class()
+    keys = (["ctrl", "shift", "c"] if cls and cls in TERMINAL_CLASSES
+            else ["ctrl", "c"])
+    r = _run(["xdotool", "key", "--clearmodifiers", "+".join(keys)], timeout=3)
+    if r.returncode != 0:
+        return None
+    text = None
+    for _ in range(3):     # apps can be slow to take clipboard ownership
+        time.sleep(0.3)
+        text = get_clipboard(timeout)
+        if text is not None and text != prev:
+            break
+    changed = text is not None and text != prev
+    if prev is not None and (changed or text is None):
+        set_clipboard(prev)   # the user's clipboard stays theirs
+    return text if changed else None
 
 
 def set_clipboard(text):

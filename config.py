@@ -105,9 +105,10 @@ RESTORE_CLIPBOARD_DELAY_S = 0.3
 # maisie = young en-GB female; libby = en-GB friendly; natasha = en-AU.
 TTS_ENABLED = False          # speak the final transcript after pasting
 # British female personas (edge-tts): sonia (RP), libby (friendly), maisie
-# (young). US fallbacks: emma, jenny, michaela(=Aria). TTS_ENGINE decides
-# which engine actually speaks — the British voices only exist on edge-tts.
-TTS_PERSONA = "sonia"
+# (young, bubbly). US fallbacks: emma, jenny, michaela(=Aria). TTS_ENGINE
+# decides which engine actually speaks — the British voices only exist on
+# edge-tts.
+TTS_PERSONA = "maisie"
 # Engine order for actually making sound: "edge" (Microsoft cloud via
 # edge-tts; the British personas live here — needs network, 403s when MS
 # rotates its handshake token) or "piper" (local neural TTS, offline, US
