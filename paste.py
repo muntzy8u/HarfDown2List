@@ -42,6 +42,26 @@ def get_selection(timeout=0.5):
     return None
 
 
+def get_selection_any(timeout=0.5):
+    """PRIMARY first (last highlighted), then CLIPBOARD (last copied).
+
+    PRIMARY goes stale — it keeps whatever was highlighted ages ago — so a
+    "read selection" click can read ancient junk. Falling back to the
+    clipboard plus a preview notification (see main.py) keeps the user in
+    control of what gets spoken.
+    """
+    sel = get_selection(timeout)
+    if sel:
+        return sel
+    try:
+        r = _run(["xclip", "-o", "-selection", "clipboard"], timeout)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout
+    except Exception:
+        pass
+    return None
+
+
 def set_clipboard(text):
     try:
         p = subprocess.Popen(

@@ -350,10 +350,15 @@ class App:
         print(f"[dbg] menu_select: {payload!r}", flush=True)
         if payload == "speak_selection":
             # Read whatever the user highlighted (PRIMARY selection) aloud —
-            # e.g. the model's reply in a terminal. No highlight = no-op.
-            sel = paste.get_selection()
+            # e.g. the model's reply in a terminal. Falls back to the
+            # clipboard when PRIMARY is stale/empty, and previews exactly
+            # what will be spoken so "random shit" can't sneak through.
+            sel = paste.get_selection_any()
             print(f"[app] read-selection: got {len(sel) if sel else 0} chars", flush=True)
             if sel:
+                preview = " ".join(sel.split())[:60]
+                subprocess.Popen(["notify-send", "HarfDown2List",
+                                  f"Reading: {preview}…"])
                 voice_out.speak_async(sel, config.TTS_PERSONA)
             else:
                 subprocess.Popen(

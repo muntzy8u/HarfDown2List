@@ -104,12 +104,15 @@ RESTORE_CLIPBOARD_DELAY_S = 0.3
 # emma = en-US-EmmaNeural (cheerful, friendly US female — default)
 # maisie = young en-GB female; libby = en-GB friendly; natasha = en-AU.
 TTS_ENABLED = False          # speak the final transcript after pasting
-TTS_PERSONA = "emma"
-# Engine order for actually making sound: "piper" (local neural TTS, offline,
-# streams straight into paplay — no audio files, no cloud, no 403s) or
-# "edge" (Microsoft cloud via edge-tts; nicer accents but 403s whenever MS
-# rotates its handshake token).
-TTS_ENGINE = "piper"
+# British female personas (edge-tts): sonia (RP), libby (friendly), maisie
+# (young). US fallbacks: emma, jenny, michaela(=Aria). TTS_ENGINE decides
+# which engine actually speaks — the British voices only exist on edge-tts.
+TTS_PERSONA = "sonia"
+# Engine order for actually making sound: "edge" (Microsoft cloud via
+# edge-tts; the British personas live here — needs network, 403s when MS
+# rotates its handshake token) or "piper" (local neural TTS, offline, US
+# voices only — streams straight into paplay, no audio files).
+TTS_ENGINE = "edge"
 # piper voice (downloaded on first use into TTS_PIPER_DATA_DIR; more at
 # rhasspy/piper-voices: en_US-lessac-medium, en_GB-alba-medium, en_US-joe…):
 TTS_PIPER_VOICE = "en_US-hfc_female-medium"
