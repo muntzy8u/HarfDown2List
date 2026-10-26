@@ -176,6 +176,25 @@ All model choices live in `config.py` — edit, then restart the app:
   (rotating) as well as the terminal — that file is the first place to
   look when a read-back misbehaves.
 
+## Auditioning a voice
+
+`voice_preview.py` lets you hear a change without restarting the app:
+
+    venv/bin/python voice_preview.py --list
+    venv/bin/python voice_preview.py --persona london_warm --rate +12% --pitch -3Hz
+    venv/bin/python voice_preview.py --persona london_warm --rate +12% --save
+
+Without `--save` it changes nothing: a separate process, it speaks through
+your speakers, writes no files, and neither the running app nor the next
+boot is affected. With `--save` the tweaked `rate`/`pitch`/`volume` are
+written back into that persona's line in `voice_out.py` (a `.bak` is kept
+alongside) and they take effect the next time the app starts. The
+persona itself — the `edge` voice, the `piper` fallback, the label — is
+edited by hand in the `VOICES` dict in `voice_out.py`.
+
+It talks to the speakers directly and knows nothing about the running app,
+so do not run it while the app is reading something out.
+
 ## Your own vocabulary
 
 Whisper mis-hears your domain words ("GitHub" -> "get", "Ollama" ->
