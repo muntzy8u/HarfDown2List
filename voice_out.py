@@ -108,7 +108,10 @@ ALIASES = {
 
 # The chosen voice is remembered between runs so the menu choice survives
 # a restart (and so "classy London" stays London after an update).
-VOICE_STATE = os.path.expanduser("~/.local/state/HarfDown2List/voice.json")
+VOICE_STATE = os.path.join(
+    getattr(config, "STATE_DIR",
+            os.path.expanduser("~/.local/state/HarfDown2List")),
+    "voice.json")
 _persona_override = None      # set by the menu at runtime
 
 

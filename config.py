@@ -85,7 +85,12 @@ TRANSCRIPT_BAR_H = 30
 TRANSCRIPT_FONT = ("xft:DejaVu Sans:size=10")
 # 0=off 1=errors only 2=status 3=debug
 LOG_LEVEL = 2
-LOG_FILE = os.path.expanduser("~/.local/state/HarfDown2List/hd2l.log")
+# Where the app keeps its own writable state (log, history, the saved
+# voice choice). Override with HD2L_STATE_DIR to run a second copy side
+# by side without the two fighting over the same files.
+STATE_DIR = os.path.expanduser(
+    os.environ.get("HD2L_STATE_DIR", "~/.local/state/HarfDown2List"))
+LOG_FILE = os.path.join(STATE_DIR, "hd2l.log")
 
 # --- Paste behaviour ---
 # Use xdotool key ctrl+v to paste at the caret; fallback: type text with xdotool.
