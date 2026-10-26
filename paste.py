@@ -157,9 +157,11 @@ def paste(text, restore=True, win_id=None):
     else:
         ok = paste_via_type(text)
     if ok and restore and prev is not None:
-        threading.Timer(
+        _t = threading.Timer(
             config.RESTORE_CLIPBOARD_DELAY_S, _restore_later, (prev,)
-        ).start()
+        )
+        _t.daemon = True
+        _t.start()
     return ok
 
 

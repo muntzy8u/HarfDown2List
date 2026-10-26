@@ -177,7 +177,9 @@ class App:
         self.bubble.collapse()
         self.bubble.set_state(IDLE)
         self.bar.set_text("", 0, status="cancelled")
-        threading.Timer(1.0, self._hide_bar).start()
+        _t = threading.Timer(1.0, self._hide_bar)
+        _t.daemon = True
+        _t.start()
 
     def _finish_session(self):
         with self._final_lock:
@@ -233,7 +235,9 @@ class App:
         self.bubble.collapse()
         self.bar.set_text("", 0, status="done" if ok else "no speech detected")
         self.bubble.set_state(IDLE)
-        threading.Timer(1.2, self._hide_bar).start()
+        _t = threading.Timer(1.2, self._hide_bar)
+        _t.daemon = True
+        _t.start()
 
     def _hide_bar(self):
         if self.state == IDLE:
@@ -376,7 +380,9 @@ class App:
         self.hidden = True
         self.bubble.layer.unmap()
         self.bar.hide()
-        threading.Timer(seconds, self._unhide).start()
+        _t = threading.Timer(seconds, self._unhide)
+        _t.daemon = True
+        _t.start()
 
     def _unhide(self):
         self.hidden = False
