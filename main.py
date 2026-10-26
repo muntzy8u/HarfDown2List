@@ -349,11 +349,12 @@ class App:
     def menu_select(self, payload):
         print(f"[dbg] menu_select: {payload!r}", flush=True)
         if payload == "speak_selection":
-            # Read the CURRENT highlight aloud. PRIMARY goes stale (X11 keeps
-            # the last highlight forever), so grab fresh: ctrl+c into the
-            # focused window, read the clipboard, restore it. No fresh
-            # highlight = say so, never read stale junk.
-            sel = paste.grab_selection_fresh()
+            # Read the CURRENT highlight aloud. PRIMARY never empties on
+            # X11, so a one-off read serves stale junk (the URL bug); a
+            # background watcher timestamps every PRIMARY change instead,
+            # and only a highlight made in the last few seconds is spoken.
+            sel = paste.recent_selection(
+                getattr(config, "SELECTION_MAX_AGE_S", 8.0))
             print(f"[app] read-selection: got {len(sel) if sel else 0} chars", flush=True)
             if sel:
                 preview = " ".join(sel.split())[:60]
@@ -362,7 +363,8 @@ class App:
                 voice_out.speak_async(sel, config.TTS_PERSONA)
             else:
                 subprocess.Popen(
-                    ["notify-send", "HarfDown2List", "Nothing selected"]
+                    ["notify-send", "HarfDown2List",
+                     "Nothing selected — highlight text, then try again"]
                 )
         elif payload == "paste_last":
             if self.last_transcript:

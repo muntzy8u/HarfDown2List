@@ -97,6 +97,10 @@ NO_PASTE_CLASSES = set()
 # After pasting, restore the clipboard to the user's previous content.
 RESTORE_CLIPBOARD = True
 RESTORE_CLIPBOARD_DELAY_S = 0.3
+# "Read selection aloud" speaks the PRIMARY selection only if it changed
+# within this many seconds (a background watcher timestamps every change).
+# Guards against reading ancient highlights; raise if the menu feels rushed.
+SELECTION_MAX_AGE_S = 8.0
 
 # --- TTS (voice read-back of transcripts / answers) ---
 # Voice personas in voice_out.py: emma, jenny, michaela, maisie, libby, ryan,

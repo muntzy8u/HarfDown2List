@@ -64,35 +64,99 @@ def get_selection_any(timeout=0.5):
 def grab_selection_fresh(timeout=1.0):
     """Copy the CURRENT highlight to the clipboard and return it.
 
-    Reading PRIMARY directly is useless for "read selection": it never
-    empties, so it keeps serving whatever was highlighted ages ago (the
-    stale-URL bug). Instead: remember the old clipboard, send ctrl+c to
-    the focused window (our overlays never take focus, so this is the app
-    the user is reading in; terminals get ctrl+shift+c), read the
-    clipboard, then ALWAYS put the user's clipboard back. If the clipboard
-    never changed, nothing was highlighted -> None. Never falls back to
-    stale sources: no fresh highlight means "nothing selected".
+    DEPRECATED on machines running xfce4-clipman with selection sync: it
+    mirrors PRIMARY<->CLIPBOARD automatically, so the sentinel gets
+    replaced with no copy at all, and xclip reads can hang ~18s while
+    ownership is in flux. Use recent_selection() instead — it observes
+    PRIMARY directly and is immune to all of this.
     """
     prev = get_clipboard(timeout)
     cls = focused_class()
     keys = (["ctrl", "shift", "c"] if cls and cls in TERMINAL_CLASSES
             else ["ctrl", "c"])
-    r = _run(["xdotool", "key", "--clearmodifiers", "+".join(keys)], timeout=3)
-    if r.returncode != 0:
+    sentinel = "hd2l-no-selection-sentinel"
+    if not set_clipboard(sentinel):
         return None
+    time.sleep(0.08)   # let xclip take ownership before the app copies
+    r = _run(["xdotool", "key", "--clearmodifiers", "+".join(keys)], timeout=3)
     text = None
-    for _ in range(3):     # apps can be slow to take clipboard ownership
-        time.sleep(0.3)
-        text = get_clipboard(timeout)
-        if text is not None and text != prev:
-            break
-    changed = text is not None and text != prev
-    if prev is not None and (changed or text is None):
-        set_clipboard(prev)   # the user's clipboard stays theirs
-    return text if changed else None
+    if r.returncode == 0:
+        # The clipboard can pass through an EMPTY phase while ownership
+        # changes hands (xfce4-clipman makes this worse) — an empty read
+        # means "not arrived yet", NOT "nothing selected". Only a
+        # non-empty, non-sentinel value counts as the fresh copy.
+        for _ in range(10):
+            time.sleep(0.25)
+            cand = get_clipboard(timeout)
+            if cand and cand != sentinel:
+                text = cand
+                break
+    # the user's clipboard stays theirs, whatever happened
+    set_clipboard(prev if prev is not None else "")
+    if text is None or text == sentinel:
+        return None
+    return text
+
+
+# ---------- PRIMARY watcher (the reliable "read selection" source) ----------
+# PRIMARY never empties, so a one-off read can't tell fresh from stale.
+# Watching it continuously can: every change is timestamped, so
+# recent_selection() can refuse anything the user hasn't highlighted
+# within the last few seconds.
+
+_sel_lock = threading.Lock()
+_sel_text = None      # last non-empty PRIMARY content seen
+_sel_time = 0.0       # monotonic timestamp of that change
+_watcher_started = False
+
+
+def watch_selection(interval=1.0):
+    """Start (idempotently) the background PRIMARY watcher thread."""
+    global _watcher_started
+    with _sel_lock:
+        if _watcher_started:
+            return
+        _watcher_started = True
+    t = threading.Thread(target=_watch_loop, args=(interval,), daemon=True)
+    t.start()
+
+
+def _watch_loop(interval=1.0):
+    global _sel_text, _sel_time
+    while True:
+        try:
+            txt = get_selection(0.9)
+            if txt and txt.strip():
+                with _sel_lock:
+                    if txt != _sel_text:
+                        _sel_text = txt
+                        _sel_time = time.monotonic()
+        except Exception:
+            pass
+        time.sleep(interval)
+
+
+def recent_selection(max_age=6.0):
+    """PRIMARY content if it changed within the last `max_age` seconds.
+
+    This is what "Read selection aloud" should use: the user highlights
+    text, then clicks the menu item — a fresh highlight is seconds old.
+    Anything older is stale junk (the old URL bug) and returns None.
+    """
+    watch_selection()
+    with _sel_lock:
+        age = time.monotonic() - _sel_time
+        if _sel_text and age <= max_age:
+            return _sel_text
+    return None
 
 
 def set_clipboard(text):
+    if not text:
+        # xclip with empty input forks and holds a BROKEN empty selection:
+        # every later read errors ("can't concat str to bytes") until the
+        # lingering owner is killed. Never plant an empty selection.
+        return False
     try:
         p = subprocess.Popen(
             ["xclip", "-i", "-selection", "clipboard"],
