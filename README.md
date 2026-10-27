@@ -4,7 +4,14 @@ Floating-bubble voice dictation for Linux/X11: press the pill to talk, press
 again to stop — clean text is pasted straight into whatever text box you had
 selected. Speech in, text out, 100% local by default.
 
-![HarfDown2List pill and flow bar](assets/screenshot.png)
+<p align="center">
+  <img src="assets/recording_icon_HD2L.jpg" width="440"
+       alt="The flow bar mid-recording: cross, live waveform, tick">
+</p>
+
+| Idle pill | Right-click menu |
+| --- | --- |
+| ![The idle pill](assets/icon_HD2L.jpg) | <img src="assets/menu_HD2L.jpg" width="200" alt="The right-click menu"> |
 
 ## Quick start
 
