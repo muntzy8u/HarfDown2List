@@ -9,9 +9,12 @@ selected. Speech in, text out, 100% local by default.
        alt="Click the pill, speak, click the tick — text pasted at your cursor">
 </p>
 
-| Idle pill | Right-click menu |
-| --- | --- |
-| ![The idle pill](assets/icon_HD2L.jpg) | <img src="assets/menu_HD2L.jpg" width="200" alt="The right-click menu"> |
+<p align="center">
+  <sub>The idle pill &nbsp;·&nbsp; the right-click menu</sub><br>
+  <img src="assets/icon_HD2L.jpg" width="110" alt="The idle pill">
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/menu_HD2L.jpg" width="110" alt="The right-click menu">
+</p>
 
 ## Quick start
 
