@@ -5,7 +5,7 @@ again to stop — clean text is pasted straight into whatever text box you had
 selected. Speech in, text out, 100% local by default.
 
 <p align="center">
-  <img src="assets/demo.gif" width="440"
+  <img src="assets/demo.gif" width="560"
        alt="Click the pill, speak, click the tick — text pasted at your cursor">
 </p>
 
