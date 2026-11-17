@@ -2,3 +2,14 @@ venv/
 __pycache__/
 *.pyc
 *.bak
+
+# assets: only the curated set is tracked — README-embedded images, the
+# runtime pill icon and its generator. Anything else dropped in here
+# (personal screenshots, drafts, experiments) stays local on purpose.
+assets/*
+!assets/demo.gif
+!assets/icon_HD2L.jpg
+!assets/menu_HD2L.jpg
+!assets/recording_icon_HD2L.jpg
+!assets/idle-mic.png
+!assets/gen_idle_icon.py
