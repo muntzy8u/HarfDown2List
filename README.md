@@ -16,6 +16,14 @@ selected. Speech in, text out, 100% local by default.
   <img src="assets/menu_HD2L.jpg" width="110" alt="The right-click menu">
 </p>
 
+> **📖 Updated 18 Nov 2026** — this README is current with `main` as it
+> stands. The voice read-back got its first tuning pass: two new personas
+> (`aria_cinema` — slow, low, narrator-style; `ava_rich` — Ava
+> multilingual), a switch for the robotic espeak last resort
+> (`TTS_ESPEAK_LAST_RESORT`, default unchanged), and the audition-first
+> tuning workflow is now documented in
+> [Voice read-back](#voice-read-back-what-actually-happened-and-how-to-tune-it).
+
 ## Quick start
 
 ```bash
