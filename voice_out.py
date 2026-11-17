@@ -385,6 +385,24 @@ def _venv_bin(name):
                         "venv", "bin", name)
 
 
+def _edge_bin():
+    """edge-tts binary, resolved exactly like the agent-facing MCP speak
+    tool: app venv first, then env override, sibling venvs, then PATH."""
+    exe = _venv_bin("edge-tts")
+    if os.path.isfile(exe) and os.access(exe, os.X_OK):
+        return exe
+    candidates = [
+        os.environ.get("EDGE_TTS_BIN"),
+        "/home/nether/.random_queries/HarfList/venv/bin/edge-tts",
+        "/home/nether/.random_queries/HarfDown2List-dev/venv/bin/edge-tts",
+        shutil.which("edge-tts"),
+    ]
+    for cand in candidates:
+        if cand and os.path.isfile(cand) and os.access(cand, os.X_OK):
+            return cand
+    raise FileNotFoundError("edge-tts not installed")
+
+
 def _voice_dir():
     return os.path.expanduser(getattr(config, "TTS_PIPER_DATA_DIR",
                                       "~/.local/state/HarfDown2List/voices"))
@@ -525,11 +543,7 @@ def _split_sentences(text, max_len=320):
 
 def _edge_cli(persona, text, out_path, timeout=90):
     """One edge-tts synthesis -> one file. Raises on failure."""
-    exe = _venv_bin("edge-tts")
-    if not os.path.exists(exe):
-        exe = shutil.which("edge-tts")
-        if not exe:
-            raise FileNotFoundError("edge-tts not installed")
+    exe = _edge_bin()
     cmd = [exe, "--voice", persona.edge,
            "--rate=%s" % persona.rate, "--pitch=%s" % persona.pitch,
            "--volume=%s" % persona.volume,
@@ -588,17 +602,13 @@ def _synth_edge(text, persona, tmpdir, clip):
 
 
 def _speak_edge(text, persona):
-    """edge-tts -> temp clip -> paplay.
+    """edge-tts -> temp clip -> ffplay (paplay if ffplay is missing).
 
     The clip is written to a private temp dir and deleted when playback
     finishes. The old code used NamedTemporaryFile(delete=False) and never
     removed it, so every read-back left an mp3 in /tmp forever.
     """
-    exe = _venv_bin("edge-tts")
-    if not os.path.exists(exe):
-        exe = shutil.which("edge-tts")
-        if not exe:
-            raise FileNotFoundError("edge-tts not installed")
+    exe = _edge_bin()
     tmpdir = tempfile.mkdtemp(prefix="hd2l-tts-")
     clip = os.path.join(tmpdir, "speech.mp3")
     def cleanup():
@@ -609,8 +619,14 @@ def _speak_edge(text, persona):
     except Exception:
         cleanup()
         raise
-    play = subprocess.Popen(["paplay", clip], stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL)
+    if shutil.which("ffplay"):
+        # Same player the agent-facing MCP speak tool uses (part of ffmpeg).
+        play = subprocess.Popen(
+            ["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", clip],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        play = subprocess.Popen(["paplay", clip], stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
     utt = Utterance([play], primary=play, cleanup=cleanup)
     utt.set_player(play)
     return utt
@@ -643,15 +659,22 @@ def speak(text, persona=None, announce_fallback=True):
     p = persona_for(persona)
     stop()                      # never talk over the previous utterance
 
-    engines = [_speak_edge, _speak_piper]
+    # MCP parity: edge-tts is the only engine by default. Anything else is
+    # strictly opt-in via config.TTS_FALLBACK_ENGINES, e.g.
+    # TTS_FALLBACK_ENGINES = ["piper", "espeak"] restores the old chain.
+    engine_map = {"edge": _speak_edge, "piper": _speak_piper,
+                  "espeak": _speak_espeak}
+    primary = "edge"
     if getattr(config, "TTS_ENGINE", "edge") != "edge":
-        engines = [_speak_piper, _speak_edge]
-    # The espeak-ng last resort is the robotic voice. It stays on by
-    # default (config.TTS_ESPEAK_LAST_RESORT = True) so an utterance is
-    # always spoken, but it can be switched off entirely; then "no voice,
-    # reason in the log" is the failure mode instead.
-    if getattr(config, "TTS_ESPEAK_LAST_RESORT", True):
-        engines.append(_speak_espeak)
+        primary = "piper"
+    engines, seen = [], set()
+    for name in [primary] + list(getattr(config, "TTS_FALLBACK_ENGINES", [])):
+        fn = engine_map.get(name)
+        if fn and name not in seen:
+            engines.append(fn)
+            seen.add(name)
+    if not engines:
+        engines.append(_speak_edge)   # never leave the chain empty
 
     for engine in engines:
         name = engine.__name__[len("_speak_"):]

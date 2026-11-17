@@ -23,6 +23,10 @@ selected. Speech in, text out, 100% local by default.
 > (`TTS_ESPEAK_LAST_RESORT`, default unchanged), and the audition-first
 > tuning workflow is now documented in
 > [Voice read-back](#voice-read-back-what-actually-happened-and-how-to-tune-it).
+>
+> **Same speech software as the agent's MCP `speak` tool:** edge-tts 7.x
+> synthesis, `ffplay` playback, and **no fallback engines by default**
+> (`TTS_FALLBACK_ENGINES = []` — piper and espeak-ng are opt-in now).
 
 ## Quick start
 
@@ -68,8 +72,9 @@ text is left safely on the clipboard.
 - Python ≥ 3.13 recommended (developed on 3.13.5).
 - Optional: [Ollama](https://ollama.com) (or any server speaking its
   `/api/chat`) for the LLM polish pass.
-- Optional: piper TTS voice (~63 MB, downloaded on first speech, offline
-  afterwards).
+- Piper TTS is opt-in only: no longer installed by default. Add
+  `piper-tts` back and list `piper` in `TTS_FALLBACK_ENGINES` if you want
+  an offline fallback voice (~63 MB, downloaded on first use).
 
 ## Config highlights
 
@@ -97,10 +102,14 @@ Everything tunable lives in `config.py` — edit, then restart the app:
 
 ## Voice read-back: what actually happened, and how to tune it
 
-The read-back chain is `edge-tts` (Microsoft cloud neural voices) →
-`piper` (local, offline) → `espeak-ng` (robotic last resort). Every
-engine is supervised and every fallback is announced — you are never
-handed a different accent in silence. Two things worth knowing:
+The read-back engine is `edge-tts` (Microsoft cloud neural voices) —
+the same software the agent-facing MCP `speak` tool runs, played through
+`ffplay`. Deeper fallbacks (`piper`, local and offline; `espeak-ng`,
+robotic) remain in the code but are **disabled by default**
+(`TTS_FALLBACK_ENGINES = []`) — the chain is edge-only unless you opt
+in. Every engine run is supervised, and any fallback that fires is
+announced — never a different accent in silence. Two things worth
+knowing:
 
 - **The robotic voice is espeak-ng**, and it only fires when *both* cloud
   and local synthesis fail — a network outage, or Microsoft answering

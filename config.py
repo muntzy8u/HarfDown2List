@@ -154,3 +154,7 @@ TTS_PIPER_NOISE_W_SCALE = 0.90     # phoneme timing variation (piper 0.8)
 # espeak-ng still speaks — that is the robotic voice. Set to False to make
 # "no voice + reason in the log" the failure mode instead.
 TTS_ESPEAK_LAST_RESORT = True
+# Engines tried after edge-tts if it fails. MCP-parity default: edge only —
+# no piper, no espeak. To restore the old chain set:
+#   TTS_FALLBACK_ENGINES = ["piper", "espeak"]
+TTS_FALLBACK_ENGINES = []
