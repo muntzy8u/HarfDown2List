@@ -87,6 +87,38 @@ Everything tunable lives in `config.py` — edit, then restart the app:
 - A self-correction spoken in a *new* session can't retro-edit the
   previous transcript — use "paste last" from the right-click menu.
 
+## Voice read-back: what actually happened, and how to tune it
+
+The read-back chain is `edge-tts` (Microsoft cloud neural voices) →
+`piper` (local, offline) → `espeak-ng` (robotic last resort). Every
+engine is supervised and every fallback is announced — you are never
+handed a different accent in silence. Two things worth knowing:
+
+- **The robotic voice is espeak-ng**, and it only fires when *both* cloud
+  and local synthesis fail — a network outage, or Microsoft answering
+  403 while rotating its handshake token (the `Sec-MS-GEC` logic that
+  `edge-tts` 7.x keeps updated). Set `TTS_ESPEAK_LAST_RESORT = False`
+  in `config.py` if you prefer silence over the robot.
+- **New personas**: `aria_cinema` (US Aria, slower and lower —
+  narrator-style) and `ava_rich` (Ava multilingual, the richest US
+  female rendering edge-tts serves). Same engine, new delivery dials.
+
+Tuning is audition-first — nothing is written until you keep it:
+
+    venv/bin/python voice_preview.py --list
+    venv/bin/python voice_preview.py --persona michaela --rate -8% --pitch -2Hz
+    venv/bin/python voice_preview.py --persona aria_cinema
+    venv/bin/python voice_preview.py --persona ava_rich
+
+`--save` writes the tweaked rate/pitch/volume back into `voice_out.py`
+(a `.bak` copy is made first) and takes effect on the next app start.
+
+Note for agent sessions that use the MCP `speak` tool: that server
+resolves the same `edge-tts` binary family (7.x, same cloud voices) and
+never falls back to espeak — it reports an error instead. It shares
+nothing local with this app, and running both at once can put two
+voices on the speakers.
+
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how it works, what runs

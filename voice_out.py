@@ -82,6 +82,12 @@ VOICES = {
     # the rest, all of them
     "michaela": _p("michaela", "Aria - US (warm)  [michaela]",
                    "en-US-AriaNeural", "en-us", "en_US-amy-medium"),
+    "aria_cinema": _p("aria_cinema", "Aria - US (cinematic, slow)",
+                      "en-US-AriaNeural", "en-us", "en_US-amy-medium",
+                      rate="-8%", pitch="-2Hz"),
+    "ava_rich": _p("ava_rich", "Ava - US (multilingual, rich)",
+                   "en-US-AvaMultilingualNeural", "en-us", "en_US-amy-medium",
+                   rate="-5%"),
     "emma": _p("emma", "Emma - US (friendly)", "en-US-EmmaNeural", "en-us",
                "en_US-amy-medium"),
     "jenny": _p("jenny", "Jenny - US (clear)", "en-US-JennyNeural", "en-us",
@@ -637,9 +643,15 @@ def speak(text, persona=None, announce_fallback=True):
     p = persona_for(persona)
     stop()                      # never talk over the previous utterance
 
-    engines = [_speak_edge, _speak_piper, _speak_espeak]
+    engines = [_speak_edge, _speak_piper]
     if getattr(config, "TTS_ENGINE", "edge") != "edge":
-        engines = [_speak_piper, _speak_edge, _speak_espeak]
+        engines = [_speak_piper, _speak_edge]
+    # The espeak-ng last resort is the robotic voice. It stays on by
+    # default (config.TTS_ESPEAK_LAST_RESORT = True) so an utterance is
+    # always spoken, but it can be switched off entirely; then "no voice,
+    # reason in the log" is the failure mode instead.
+    if getattr(config, "TTS_ESPEAK_LAST_RESORT", True):
+        engines.append(_speak_espeak)
 
     for engine in engines:
         name = engine.__name__[len("_speak_"):]
@@ -685,6 +697,7 @@ def speak_async(text, persona=None):
 
 def available_personas():
     """[(key, label), ...] in menu order - London voices first."""
-    order = ["london", "london_warm", "london_bright", "michaela", "aussie_f",
+    order = ["london", "london_warm", "london_bright", "michaela",
+             "aria_cinema", "ava_rich", "aussie_f",
              "emma", "jenny", "ryan", "aussie_m", "us_f", "us_m"]
     return [(k, VOICES[k].label) for k in order if k in VOICES]

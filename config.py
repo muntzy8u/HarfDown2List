@@ -150,3 +150,7 @@ TTS_PIPER_SENTENCE_SILENCE = 0.35  # pause between sentences (s) — phrasing
 TTS_PIPER_LENGTH_SCALE = 1.0       # >1 = slower/more deliberate, <1 = brisker
 TTS_PIPER_NOISE_SCALE = 0.70       # intonation expressiveness (piper 0.667)
 TTS_PIPER_NOISE_W_SCALE = 0.90     # phoneme timing variation (piper 0.8)
+# Robotic last resort. When BOTH edge-tts (cloud) and piper (local) fail,
+# espeak-ng still speaks — that is the robotic voice. Set to False to make
+# "no voice + reason in the log" the failure mode instead.
+TTS_ESPEAK_LAST_RESORT = True
