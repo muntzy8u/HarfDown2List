@@ -10,6 +10,5 @@ assets/*
 !assets/demo.gif
 !assets/icon_HD2L.jpg
 !assets/menu_HD2L.jpg
-!assets/recording_icon_HD2L.jpg
 !assets/idle-mic.png
 !assets/gen_idle_icon.py
