@@ -6,5 +6,3 @@ python-xlib==0.33
 pynput==1.8.2
 requests==2.34.2
 edge-tts==7.3.1
-# piper-tts removed 2026-11-18 — opt-in fallback only; reinstall with
-# `pip install piper-tts==1.8.0` and list "piper" in TTS_FALLBACK_ENGINES.

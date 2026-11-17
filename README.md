@@ -17,23 +17,21 @@ selected. Speech in, text out, 100% local by default.
 </p>
 
 > **📖 Updated 18 Nov 2026** — this README is current with `main` as it
-> stands. The voice read-back got its first tuning pass: two new personas
+> stands. The voice read-back was retuned: two new cinematic personas
 > (`aria_cinema` — slow, low, narrator-style; `ava_rich` — Ava
-> multilingual), a switch for the robotic espeak last resort
-> (`TTS_ESPEAK_LAST_RESORT`, default unchanged), and the audition-first
-> tuning workflow is now documented in
+> multilingual), and the speech software is now identical to the agent's
+> MCP `speak` tool: edge-tts 7.x synthesis through `ffplay`, with **no
+> fallback engines** — if the cloud is down, the read-back stays silent
+> and logs why. It never falls back to a robotic voice. The tuning
+> workflow is documented in
 > [Voice read-back](#voice-read-back-what-actually-happened-and-how-to-tune-it).
->
-> **Same speech software as the agent's MCP `speak` tool:** edge-tts 7.x
-> synthesis, `ffplay` playback, and **no fallback engines by default**
-> (`TTS_FALLBACK_ENGINES = []` — piper and espeak-ng are opt-in now).
 
 ## Quick start
 
 ```bash
 sudo apt install python3 python3-venv python3-pip xdotool xclip \
-                 libportaudio2 fonts-dejavu-core pulseaudio-utils \
-                 espeak-ng libnotify-bin
+                 libportaudio2 fonts-dejavu-core ffmpeg \
+                 libnotify-bin
 git clone https://github.com/muntzy8u/HarfDown2List.git
 cd HarfDown2List
 python3 -m venv venv
@@ -72,9 +70,7 @@ text is left safely on the clipboard.
 - Python ≥ 3.13 recommended (developed on 3.13.5).
 - Optional: [Ollama](https://ollama.com) (or any server speaking its
   `/api/chat`) for the LLM polish pass.
-- Piper TTS is opt-in only: no longer installed by default. Add
-  `piper-tts` back and list `piper` in `TTS_FALLBACK_ENGINES` if you want
-  an offline fallback voice (~63 MB, downloaded on first use).
+- Piper TTS was removed entirely in this update.
 
 ## Config highlights
 
@@ -104,18 +100,16 @@ Everything tunable lives in `config.py` — edit, then restart the app:
 
 The read-back engine is `edge-tts` (Microsoft cloud neural voices) —
 the same software the agent-facing MCP `speak` tool runs, played through
-`ffplay`. Deeper fallbacks (`piper`, local and offline; `espeak-ng`,
-robotic) remain in the code but are **disabled by default**
-(`TTS_FALLBACK_ENGINES = []`) — the chain is edge-only unless you opt
-in. Every engine run is supervised, and any fallback that fires is
-announced — never a different accent in silence. Two things worth
-knowing:
+`ffplay`. There are **no fallback engines and no robotic last resort**:
+if the cloud is unreachable, nothing is spoken and the reason lands in
+the log. Every utterance is supervised (watchdog, temp-file cleanup, one
+voice at a time). Two things worth knowing:
 
-- **The robotic voice is espeak-ng**, and it only fires when *both* cloud
-  and local synthesis fail — a network outage, or Microsoft answering
-  403 while rotating its handshake token (the `Sec-MS-GEC` logic that
-  `edge-tts` 7.x keeps updated). Set `TTS_ESPEAK_LAST_RESORT = False`
-  in `config.py` if you prefer silence over the robot.
+- **espeak-ng and piper were removed entirely** in this update —
+  espeak-ng was the robotic last resort. The one realistic failure mode
+  left is Microsoft answering 403 while rotating its handshake token
+  (the `Sec-MS-GEC` logic that `edge-tts` 7.x keeps updated) — and that
+  now ends in a logged error and silence.
 - **New personas**: `aria_cinema` (US Aria, slower and lower —
   narrator-style) and `ava_rich` (Ava multilingual, the richest US
   female rendering edge-tts serves). Same engine, new delivery dials.
@@ -132,7 +126,7 @@ Tuning is audition-first — nothing is written until you keep it:
 
 Note for agent sessions that use the MCP `speak` tool: that server
 resolves the same `edge-tts` binary family (7.x, same cloud voices) and
-never falls back to espeak — it reports an error instead. It shares
+never falls back to a robotic voice — it reports an error instead. It shares
 nothing local with this app, and running both at once can put two
 voices on the speakers.
 

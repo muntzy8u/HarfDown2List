@@ -1,23 +1,16 @@
 """Voice read-back: speak the final transcript, a selected passage, or an
 agent's answer aloud.
 
-Engines, tried in order (config.TTS_ENGINE puts one first):
-  edge-tts  — Microsoft cloud. The British personas live here.
-  piper     — local neural TTS, offline. Streams raw PCM into paplay.
-  espeak-ng — last-resort robotic fallback.
+One engine, exactly like the agent-facing MCP speak tool:
+  edge-tts — Microsoft cloud neural voices (the venv edge-tts 7.x CLI),
+  played back with ffplay (ffmpeg). There are no fallback engines: if the
+  cloud is unreachable the read-back fails loudly in the log and nothing
+  is spoken — never a different, never a robotic, voice.
 
-Every utterance is SUPERVISED. Each engine runs in its own process group
-with a watchdog that kills it if it overruns, its temp files are removed
-afterwards, and a new utterance always stops the previous one. That is the
-difference between "speaks" and "wedges the audio device until the machine
-looks frozen" — which is exactly what the old code did when paplay stalled:
-the speak thread blocked forever on piper's stdin, every later request
-stacked another stuck piper+paplay pair on the audio server, and nothing
-ever cleaned up.
-
-The persona is explicit about which voice actually spoke. If the requested
-British cloud voice is unavailable and we fall back to a local voice, the
-user is told rather than being handed a different accent in silence.
+Every utterance is SUPERVISED: it runs in its own process group with a
+watchdog that kills it if it overruns (config.TTS_MAX_SECONDS), its temp
+files are removed afterwards, and a new utterance always stops the
+previous one — never two voices at once.
 """
 import atexit
 import json
@@ -38,70 +31,49 @@ log = logs.get_logger("tts")
 
 
 class Persona:
-    """One voice: a cloud voice, a local voice, a robotic voice and the
-    delivery knobs that turn the same voice into a different character."""
+    """One voice: a cloud voice plus the delivery knobs that turn it
+    into a different character."""
 
-    __slots__ = ("key", "label", "edge", "espeak", "piper", "rate", "pitch",
-                 "volume")
+    __slots__ = ("key", "label", "edge", "rate", "pitch", "volume")
 
-    def __init__(self, key, label, edge, espeak, piper=None,
+    def __init__(self, key, label, edge,
                  rate="+0%", pitch="+0Hz", volume="+0%"):
         self.key = key
         self.label = label
         self.edge = edge
-        self.espeak = espeak
-        self.piper = piper
         self.rate = rate
         self.pitch = pitch
         self.volume = volume
 
-    @property
-    def british(self):
-        return self.edge.startswith("en-GB")
+
+def _p(key, label, edge, rate="+0%", pitch="+0Hz", volume="+0%"):
+    return Persona(key, label, edge, rate, pitch, volume)
 
 
-def _p(key, label, edge, espeak, piper=None, rate="+0%", pitch="+0Hz",
-       volume="+0%"):
-    return Persona(key, label, edge, espeak, piper, rate, pitch, volume)
-
-
-# The British voices are the reason this app asks for edge-tts first: the
-# en-GB personas only exist in the cloud. The piper column is the LOCAL
-# fallback, so a network outage still leaves a British voice in the room.
+# The only synthesis engine is edge-tts; every persona is a cloud voice.
 VOICES = {
     # the three London voices
     "london": _p("london", "Sonia - London (classy)",
-                 "en-GB-SoniaNeural", "en+rp",
-                 "en_GB-jenny_dioco-medium", rate="+9%", pitch="+2Hz"),
+                 "en-GB-SoniaNeural", rate="+9%", pitch="+2Hz"),
     "london_warm": _p("london_warm", "Libby - London (warm)",
-                      "en-GB-LibbyNeural", "en+rp",
-                      "en_GB-jenny_dioco-medium", rate="+9%", pitch="+2Hz"),
+                      "en-GB-LibbyNeural", rate="+9%", pitch="+2Hz"),
     "london_bright": _p("london_bright", "Maisie - London (bright)",
-                        "en-GB-MaisieNeural", "en+rp",
-                        "en_GB-jenny_dioco-medium", rate="+9%", pitch="+3Hz"),
+                        "en-GB-MaisieNeural", rate="+9%", pitch="+3Hz"),
     # the rest, all of them
     "michaela": _p("michaela", "Aria - US (warm)  [michaela]",
-                   "en-US-AriaNeural", "en-us", "en_US-amy-medium"),
+                   "en-US-AriaNeural"),
     "aria_cinema": _p("aria_cinema", "Aria - US (cinematic, slow)",
-                      "en-US-AriaNeural", "en-us", "en_US-amy-medium",
-                      rate="-8%", pitch="-2Hz"),
+                      "en-US-AriaNeural", rate="-8%", pitch="-2Hz"),
     "ava_rich": _p("ava_rich", "Ava - US (multilingual, rich)",
-                   "en-US-AvaMultilingualNeural", "en-us", "en_US-amy-medium",
-                   rate="-5%"),
-    "emma": _p("emma", "Emma - US (friendly)", "en-US-EmmaNeural", "en-us",
-               "en_US-amy-medium"),
-    "jenny": _p("jenny", "Jenny - US (clear)", "en-US-JennyNeural", "en-us",
-                "en_US-amy-medium"),
-    "aussie_f": _p("aussie_f", "Natasha - Australian",
-                   "en-AU-NatashaNeural", "en", "en_US-amy-medium"),
-    "ryan": _p("ryan", "Ryan - British (male)", "en-GB-RyanNeural", "en",
-               "en_GB-northern_english_male-medium"),
+                   "en-US-AvaMultilingualNeural", rate="-5%"),
+    "emma": _p("emma", "Emma - US (friendly)", "en-US-EmmaNeural"),
+    "jenny": _p("jenny", "Jenny - US (clear)", "en-US-JennyNeural"),
+    "aussie_f": _p("aussie_f", "Natasha - Australian", "en-AU-NatashaNeural"),
+    "ryan": _p("ryan", "Ryan - British (male)", "en-GB-RyanNeural"),
     "aussie_m": _p("aussie_m", "William - Australian (male)",
-                   "en-AU-WilliamNeural", "en", "en_US-hfc_male-medium"),
-    "us_f": _p("us_f", "Aria - US  [us_f]", "en-US-AriaNeural", "en-us",
-               "en_US-amy-medium"),
-    "us_m": _p("us_m", "Guy - US (male)", "en-US-GuyNeural", "en-us",
-               "en_US-hfc_male-medium"),
+                   "en-AU-WilliamNeural"),
+    "us_f": _p("us_f", "Aria - US  [us_f]", "en-US-AriaNeural"),
+    "us_m": _p("us_m", "Guy - US (male)", "en-US-GuyNeural"),
 }
 
 # Older names still work, so old configs and muscle memory do not break.
@@ -403,100 +375,6 @@ def _edge_bin():
     raise FileNotFoundError("edge-tts not installed")
 
 
-def _voice_dir():
-    return os.path.expanduser(getattr(config, "TTS_PIPER_DATA_DIR",
-                                      "~/.local/state/HarfDown2List/voices"))
-
-
-def _piper_voice_for(persona):
-    """The local voice to use for this persona (may not be downloaded)."""
-    wanted = getattr(persona, "piper", None) or getattr(
-        config, "TTS_PIPER_VOICE", "en_US-amy-medium")
-    if os.path.exists(os.path.join(_voice_dir(), wanted + ".onnx")):
-        return wanted
-    # Not on disk: fall back to whatever IS on disk, but never hand a male
-    # persona a female voice (that is how "Ryan" ends up sounding like
-    # Jenny). Match the gender of the cloud voice first.
-    male = any(tag in getattr(persona, "edge", "").lower()
-               for tag in ("ryan", "william", "guy", "thomas", "alan",
-                           "brian", "eric", "roger", "steffan", "chris"))
-    first, second = (("en_US-hfc_male-medium", "en_GB-northern_english_male-medium")
-                     if male else
-                     ("en_GB-jenny_dioco-medium", "en_US-amy-medium"))
-    for alt in (wanted, first, second, "en_US-lessac-medium",
-                "en_US-hfc_female-medium"):
-        if os.path.exists(os.path.join(_voice_dir(), alt + ".onnx")):
-            return alt
-    raise RuntimeError(
-        "no piper voice found in %s (download one with: venv/bin/python -m "
-        "piper.download_voices --download-dir '%s' <voice>)"
-        % (_voice_dir(), _voice_dir()))
-
-
-def _piper_rate(voice):
-    """Audio sample rate of a piper voice (Hz)."""
-    import json
-    rate = getattr(config, "TTS_PIPER_RATE", 0)
-    if rate:
-        return int(rate)
-    try:
-        with open(os.path.join(_voice_dir(), voice + ".onnx.json"),
-                  encoding="utf-8") as f:
-            meta = json.load(f)
-        audio = meta.get("audio", {})
-        return int(audio.get("sample_rate") or audio.get("sampling_rate")
-                   or meta.get("sample_rate") or 22050)
-    except Exception:
-        return 22050
-
-
-def _speak_piper(text, persona):
-    """Piper synth -> raw PCM piped into paplay.
-
-    The text is handed to piper through a FILE, not a pipe: a pipe can fill
-    up and block the caller forever when the player stalls, which is how the
-    old code wedged the audio device.
-    """
-    exe = _venv_bin("piper")
-    if not os.path.exists(exe):
-        exe = shutil.which("piper")
-        if not exe:
-            raise RuntimeError("piper not installed")
-    voice = _piper_voice_for(persona)
-    tmpdir = tempfile.mkdtemp(prefix="hd2l-tts-")
-    textfile = os.path.join(tmpdir, "text.txt")
-    with open(textfile, "w", encoding="utf-8") as f:
-        f.write(text)
-    cmd = [exe, "--data-dir", _voice_dir(), "-m", voice, "-i", textfile,
-           "--output-raw"]
-    length = getattr(config, "TTS_PIPER_LENGTH_SCALE", 1.0)
-    if length and length != 1.0:
-        cmd += ["--length-scale", str(length)]
-    silence = getattr(config, "TTS_PIPER_SENTENCE_SILENCE", 0)
-    if silence and silence > 0:
-        cmd += ["--sentence-silence", str(silence)]
-    noise = getattr(config, "TTS_PIPER_NOISE_SCALE", 0)
-    if noise:
-        cmd += ["--noise-scale", str(noise)]
-    noisew = getattr(config, "TTS_PIPER_NOISE_W_SCALE", 0)
-    if noisew:
-        cmd += ["--noise-w-scale", str(noisew)]
-
-    piper = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                              stderr=subprocess.DEVNULL)
-    play = subprocess.Popen(
-        ["paplay", "--raw", "--format=s16le",
-         "--rate=%d" % _piper_rate(voice), "--channels=1"],
-        stdin=piper.stdout, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL)
-    piper.stdout.close()          # the player owns the read end now
-
-    def cleanup():
-        shutil.rmtree(tmpdir, ignore_errors=True)
-
-    utt = Utterance([play, piper], primary=play, cleanup=cleanup)
-    utt.set_player(play)
-    return utt
 
 
 # Abbreviations that must not end a sentence.
@@ -602,7 +480,7 @@ def _synth_edge(text, persona, tmpdir, clip):
 
 
 def _speak_edge(text, persona):
-    """edge-tts -> temp clip -> ffplay (paplay if ffplay is missing).
+    """edge-tts -> temp clip -> ffplay."
 
     The clip is written to a private temp dir and deleted when playback
     finishes. The old code used NamedTemporaryFile(delete=False) and never
@@ -619,96 +497,43 @@ def _speak_edge(text, persona):
     except Exception:
         cleanup()
         raise
-    if shutil.which("ffplay"):
-        # Same player the agent-facing MCP speak tool uses (part of ffmpeg).
-        play = subprocess.Popen(
-            ["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", clip],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    else:
-        play = subprocess.Popen(["paplay", clip], stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL)
+    if not shutil.which("ffplay"):
+        raise RuntimeError("ffplay (ffmpeg) is not installed - required "
+                           "to play audio")
+    play = subprocess.Popen(
+        ["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", clip],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     utt = Utterance([play], primary=play, cleanup=cleanup)
     utt.set_player(play)
-    return utt
-
-
-def _speak_espeak(text, persona):
-    """Robotic last resort. Still supervised: it must not outlive its use."""
-    exe = shutil.which("espeak-ng") or shutil.which("espeak")
-    if not exe:
-        raise RuntimeError("espeak-ng not installed")
-    proc = subprocess.Popen([exe, "-v", persona.espeak, "-s", "155", text],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    utt = Utterance([proc], primary=proc)
-    utt.set_player(proc)
     return utt
 
 
 # --------------------------------------------------------------------------
 # public API
 # --------------------------------------------------------------------------
-def speak(text, persona=None, announce_fallback=True):
-    """Speak text aloud with the configured engine chain.
+def speak(text, persona=None):
+    """Speak text aloud with edge-tts, played back with ffplay.
 
     Returns the Utterance that is playing, or None if nothing could speak.
     Any previous utterance is stopped first: two voices at once is never
-    what the user meant.
+    what the user meant. There are no fallback engines: if edge-tts fails,
+    the reason is in the log and nothing is spoken — never a different,
+    never a robotic, voice.
     """
     if not text or not text.strip():
         return None
     p = persona_for(persona)
     stop()                      # never talk over the previous utterance
-
-    # MCP parity: edge-tts is the only engine by default. Anything else is
-    # strictly opt-in via config.TTS_FALLBACK_ENGINES, e.g.
-    # TTS_FALLBACK_ENGINES = ["piper", "espeak"] restores the old chain.
-    engine_map = {"edge": _speak_edge, "piper": _speak_piper,
-                  "espeak": _speak_espeak}
-    primary = "edge"
-    if getattr(config, "TTS_ENGINE", "edge") != "edge":
-        primary = "piper"
-    engines, seen = [], set()
-    for name in [primary] + list(getattr(config, "TTS_FALLBACK_ENGINES", [])):
-        fn = engine_map.get(name)
-        if fn and name not in seen:
-            engines.append(fn)
-            seen.add(name)
-    if not engines:
-        engines.append(_speak_edge)   # never leave the chain empty
-
-    for engine in engines:
-        name = engine.__name__[len("_speak_"):]
-        try:
-            utt = engine(text, p)
-        except Exception as e:
-            log.warning("%s failed: %s", name, e)
-            continue
-        global _current
-        with _current_lock:
-            _current = utt
-        log.info("speaking with %s (%s)", name, p.label)
-        if name != "edge" and announce_fallback:
-            _announce_fallback(p, name)
-        return utt
-    log.error("no engine worked; nothing was spoken")
-    return None
-
-
-def _announce_fallback(persona, engine_name):
-    """Tell the user the voice they asked for is not the voice they got."""
     try:
-        import notify
-        if persona.british:
-            body = ("The %s cloud voice is unavailable right now, so the "
-                    "local %s voice spoke instead. Check the log for why."
-                    % (persona.label, engine_name))
-        else:
-            body = ("The cloud voice is unavailable right now, so the local "
-                    "%s voice spoke instead. Check the log for why."
-                    % engine_name)
-        notify.notify("HarfDown2List: voice fallback", body)
-    except Exception:
-        pass
+        utt = _speak_edge(text, p)
+    except Exception as e:
+        log.error("edge-tts read-back failed: %s", e)
+        return None
+    global _current
+    with _current_lock:
+        _current = utt
+    log.info("speaking with edge (%s)", p.label)
+    return utt
 
 
 def speak_async(text, persona=None):

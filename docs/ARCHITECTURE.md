@@ -44,11 +44,11 @@ left safely on the clipboard.
 - **Paste**: xclip + xdotool, terminal-aware (ctrl+shift+v in terminals,
   ctrl+v elsewhere). Your previous clipboard content is restored after.
 - **Voice read-out**: optional for transcripts (`TTS_ENABLED`), always
-  available for the right-click menu. edge-tts (Microsoft cloud) speaks
-  first, because the British voices live there; piper (local neural TTS,
-  fully offline) is the fallback, then espeak-ng. Every utterance is
-  supervised: it runs under a watchdog, is killed if it overruns, its temp
-  files are removed, and a new read-back always stops the one before it —
+  available for the right-click menu. edge-tts (Microsoft cloud neural
+  voices) is the only engine, played back through ffplay. Every utterance
+  is supervised: it runs under a watchdog, is killed if it overruns, its
+  temp files are removed, and a new read-back always stops the one before
+  it —
   so voices can never pile up on top of each other. The right-click menu
   can switch voice, pause and resume a read-back, and stop it (Esc works
   too). If the requested cloud voice is unavailable the app says so
@@ -84,7 +84,7 @@ left safely on the clipboard.
     audio.py      mic capture, level metering, silence trim, pause
     engine.py     partial/final transcription + LLM polish
     vocabulary.py custom dictionary (post-STT corrections before paste)
-    voice_out.py  TTS engines (edge-tts -> piper -> espeak) + personas
+    voice_out.py  TTS engine (edge-tts -> ffplay) + personas
     voice_preview.py audition a voice without restarting the app
     logs.py       rotating log file (config.LOG_FILE) + stdout mirror
     notify.py     desktop notifications, reaped (no zombie notify-send)

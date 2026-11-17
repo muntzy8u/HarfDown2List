@@ -127,10 +127,9 @@ TTS_PERSONA = "london"
 # The voices the menu cycles through, in order. Kept short so the way back
 # to the first one is a single click. Add more keys to widen the cycle.
 TTS_PERSONA_CYCLE = ["london", "london_warm", "london_bright"]
-# Engine order for actually making sound: "edge" (Microsoft cloud via
-# edge-tts; the British personas live here - needs network, 403s when MS
-# rotates its handshake token) or "piper" (local neural TTS, offline -
-# streams straight into paplay, no audio files).
+# The only engine: edge-tts (Microsoft cloud neural voices). Needs network;
+# Microsoft occasionally answers 403 while rotating its handshake token -
+# edge-tts 7.x keeps up with that. Playback runs through ffplay (ffmpeg).
 TTS_ENGINE = "edge"
 # Hard cap on one utterance. A player that overruns is killed, so nothing
 # can sit on the audio device and wedge the machine.
@@ -140,21 +139,3 @@ TTS_MAX_SECONDS = 300.0
 # between, instead of one long flat run. False = one request for
 # everything, which is faster to start but reads like a list.
 TTS_SENTENCE_SPLIT = True
-# Local piper voice used when the cloud voice is unreachable. It should be
-# British too, so a network outage does not swap the accent.
-TTS_PIPER_VOICE = "en_GB-jenny_dioco-medium"
-TTS_PIPER_DATA_DIR = os.path.expanduser("~/.local/state/HarfDown2List/voices")
-TTS_PIPER_RATE = 0    # 0 = read the rate from the voice's .json (≈22050 Hz)
-# Piper delivery shaping — the "articulate" dials:
-TTS_PIPER_SENTENCE_SILENCE = 0.35  # pause between sentences (s) — phrasing
-TTS_PIPER_LENGTH_SCALE = 1.0       # >1 = slower/more deliberate, <1 = brisker
-TTS_PIPER_NOISE_SCALE = 0.70       # intonation expressiveness (piper 0.667)
-TTS_PIPER_NOISE_W_SCALE = 0.90     # phoneme timing variation (piper 0.8)
-# Robotic last resort. When BOTH edge-tts (cloud) and piper (local) fail,
-# espeak-ng still speaks — that is the robotic voice. Set to False to make
-# "no voice + reason in the log" the failure mode instead.
-TTS_ESPEAK_LAST_RESORT = True
-# Engines tried after edge-tts if it fails. MCP-parity default: edge only —
-# no piper, no espeak. To restore the old chain set:
-#   TTS_FALLBACK_ENGINES = ["piper", "espeak"]
-TTS_FALLBACK_ENGINES = []
