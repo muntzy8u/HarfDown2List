@@ -139,3 +139,12 @@ TTS_MAX_SECONDS = 300.0
 # between, instead of one long flat run. False = one request for
 # everything, which is faster to start but reads like a list.
 TTS_SENTENCE_SPLIT = True
+# Live translation for read-backs: when set, every "read aloud" first
+# translates the text with the local ollama LLM, then speaks it with the
+# native matching persona (lisboa / Raquel for European Portuguese). If the
+# LLM is unreachable the ORIGINAL text is read and the reason logged.
+# Empty string = off. This is the feature: select/answer in English, hear
+# it in Portuguese from Portugal.
+TTS_TRANSLATE_TO = "European Portuguese (Portugal)"
+# Model for the translation pass. Empty = the LLM_POLISH_MODEL.
+TTS_TRANSLATE_MODEL = ""

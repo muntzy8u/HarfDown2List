@@ -116,6 +116,13 @@ voice at a time). Two things worth knowing:
   rendering edge-tts serves) and `lisboa` (Raquel, native European
   Portuguese — reads Portuguese from Portugal, not Brazil). Same engine,
   new delivery dials.
+- **Live translation**: with `TTS_TRANSLATE_TO` set (European Portuguese,
+  Portugal — enabled by default), every read-back translates the English
+  text on the fly with the local ollama LLM and speaks it with the
+  native lisboa voice. If the LLM is unreachable the original English is
+  read instead; set it to `""` to switch the whole pass off. Dictation
+  (STT) remains English-only — swap `PARTIAL_MODEL`/`FINAL_MODEL` for
+  multilingual Whisper models if you ever want that too.
 
 Tuning is audition-first — nothing is written until you keep it:
 

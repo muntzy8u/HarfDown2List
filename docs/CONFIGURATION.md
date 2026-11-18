@@ -53,7 +53,10 @@ some cloud models return reasoning text that would leak into pastes.
   engine — `edge-tts` (Microsoft cloud), played back through `ffplay` —
   so nothing can fall back to a different accent or a robotic voice.
   `TTS_MAX_SECONDS` is the watchdog that kills a runaway read-back. The
-  per-persona `rate` / `pitch` live in `voice_out.py`.
+  per-persona `rate` / `pitch` live in `voice_out.py`, and
+  `TTS_TRANSLATE_TO` turns on live translation: read-backs are translated
+  to that language by the local ollama LLM and spoken with the matching
+  native persona.
 
 ## Auditioning a voice
 

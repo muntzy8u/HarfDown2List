@@ -513,21 +513,90 @@ def _speak_edge(text, persona):
 # --------------------------------------------------------------------------
 # public API
 # --------------------------------------------------------------------------
+def _translate(text, target):
+    """Translate text into `target` with the local ollama LLM - the same
+    endpoint and request discipline as engine.polish(). Returns the
+    translation, or None on any failure (callers read the original text)."""
+    import requests
+
+    if not text.strip():
+        return None
+    payload = {
+        "model": getattr(config, "TTS_TRANSLATE_MODEL", "")
+                 or config.LLM_POLISH_MODEL,
+        "stream": False,
+        "think": False,  # cloud-router models reason away the budget otherwise
+        "messages": [
+            {
+                "role": "user",
+                "content": (
+                    "Translate this text into " + target + " for a "
+                    "text-to-speech voice. Rules:\n"
+                    "1. Use exactly the language variant it names - for "
+                    "European Portuguese, Portugal's forms and registers, "
+                    "never the Brazilian ones (no 'você' phrasing, no "
+                    "gerund-style constructions).\n"
+                    "2. Keep meaning, names, numbers and emphasis exactly.\n"
+                    "3. Write it out-loud friendly: complete sentences a "
+                    "voice reads naturally.\n"
+                    "4. Return ONLY the translation, nothing else.\n\n"
+                    f"Text: {text}"
+                ),
+            }
+        ],
+        "options": {"temperature": 0.2, "num_predict": 1024},
+    }
+    try:
+        url = getattr(config, "TTS_LLM_URL", "") or "http://127.0.0.1:11434"
+        r = requests.post(url + "/api/chat", json=payload, timeout=20.0)
+        r.raise_for_status()
+        out = r.json()["message"]["content"].strip()
+        lowered = out.lower()
+        for pat in ("translation:", "translated:", "output:", "text:",
+                    "aqui está", "here is the translation:",
+                    "here's the translation:"):
+            if lowered.startswith(pat):
+                out = out[len(pat):].strip()
+                lowered = out.lower()
+        return out or None
+    except Exception as e:
+        log.error("translation pass failed (%s)", e)
+        return None
+
+
 def speak(text, persona=None):
     """Speak text aloud with edge-tts, played back with ffplay.
 
     Returns the Utterance that is playing, or None if nothing could speak.
     Any previous utterance is stopped first: two voices at once is never
-    what the user meant. There are no fallback engines: if edge-tts fails,
-    the reason is in the log and nothing is spoken — never a different,
-    never a robotic, voice.
+    what the user meant.
+
+    With config.TTS_TRANSLATE_TO set, the text is translated on the fly and
+    read in that language by the native matching persona (lisboa / Raquel
+    for European Portuguese). If the translation pass fails, the ORIGINAL
+    text is read - the read-back never falls silent for that reason.
     """
     if not text or not text.strip():
         return None
     p = persona_for(persona)
     stop()                      # never talk over the previous utterance
+
+    spoken_text = text
+    target = getattr(config, "TTS_TRANSLATE_TO", "")
+    if target:
+        translated = _translate(text, target)
+        if translated:
+            spoken_text = translated
+            if "lisboa" in VOICES and p.edge != "pt-PT-RaquelNeural":
+                log.info("translation to %s: reading with the lisboa "
+                         "persona (native pt-PT voice)", target)
+                p = VOICES["lisboa"]
+        else:
+            log.error("translation to %s failed; reading the original "
+                      "English text", target)
+
     try:
-        utt = _speak_edge(text, p)
+        utt = _speak_edge(spoken_text, p)
     except Exception as e:
         log.error("edge-tts read-back failed: %s", e)
         return None
