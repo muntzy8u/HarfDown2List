@@ -48,8 +48,8 @@ some cloud models return reasoning text that would leak into pastes.
   cycles through (`london`, `london_warm`, `london_bright` — one click
   back to the first), and the menu remembers your choice in
   `~/.local/state/HarfDown2List/voice.json`. Other personas exist for
-  reference: `emma`, `jenny`, `michaela`, `aria_cinema`, `ava_rich`,
-  `ryan`, `aussie_f`, `aussie_m`, `us_f`, `us_m`. There is a single
+  reference: `lisboa`, `emma`, `jenny`, `michaela`, `aria_cinema`,
+  `ava_rich`, `ryan`, `aussie_f`, `aussie_m`, `us_f`, `us_m`. There is a single
   engine — `edge-tts` (Microsoft cloud), played back through `ffplay` —
   so nothing can fall back to a different accent or a robotic voice.
   `TTS_MAX_SECONDS` is the watchdog that kills a runaway read-back. The

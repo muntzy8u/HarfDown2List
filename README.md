@@ -17,13 +17,14 @@ selected. Speech in, text out, 100% local by default.
 </p>
 
 > **📖 Updated 18 Nov 2026** — this README is current with `main` as it
-> stands. The voice read-back was retuned: two new cinematic personas
-> (`aria_cinema` — slow, low, narrator-style; `ava_rich` — Ava
-> multilingual), and the speech software is now identical to the agent's
-> MCP `speak` tool: edge-tts 7.x synthesis through `ffplay`, with **no
-> fallback engines** — if the cloud is down, the read-back stays silent
-> and logs why. It never falls back to a robotic voice. The tuning
-> workflow is documented in
+> stands. The voice read-back was retuned: three cinematic personas —
+> `aria_cinema` (slow, low, narrator-style), `ava_rich` (Ava
+> multilingual) and `lisboa` (Raquel, native Portugal accent, so
+> European Portuguese never drifts to Brazil) — and the speech software
+> is identical to the agent's MCP `speak` tool: edge-tts 7.x synthesis
+> through `ffplay`, with **no fallback engines** — if the cloud is down,
+> the read-back stays silent and logs why. It never falls back to a
+> robotic voice. The tuning workflow is documented in
 > [Voice read-back](#voice-read-back-what-actually-happened-and-how-to-tune-it).
 
 ## Quick start
@@ -111,8 +112,10 @@ voice at a time). Two things worth knowing:
   (the `Sec-MS-GEC` logic that `edge-tts` 7.x keeps updated) — and that
   now ends in a logged error and silence.
 - **New personas**: `aria_cinema` (US Aria, slower and lower —
-  narrator-style) and `ava_rich` (Ava multilingual, the richest US
-  female rendering edge-tts serves). Same engine, new delivery dials.
+  narrator-style), `ava_rich` (Ava multilingual, the richest US female
+  rendering edge-tts serves) and `lisboa` (Raquel, native European
+  Portuguese — reads Portuguese from Portugal, not Brazil). Same engine,
+  new delivery dials.
 
 Tuning is audition-first — nothing is written until you keep it:
 

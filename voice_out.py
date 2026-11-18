@@ -59,6 +59,8 @@ VOICES = {
                       "en-GB-LibbyNeural", rate="+9%", pitch="+2Hz"),
     "london_bright": _p("london_bright", "Maisie - London (bright)",
                         "en-GB-MaisieNeural", rate="+9%", pitch="+3Hz"),
+    "lisboa": _p("lisboa", "Raquel - Lisboa (pt-PT, cinematic)",
+                 "pt-PT-RaquelNeural", rate="-8%", pitch="-2Hz"),
     # the rest, all of them
     "michaela": _p("michaela", "Aria - US (warm)  [michaela]",
                    "en-US-AriaNeural"),
@@ -545,7 +547,7 @@ def speak_async(text, persona=None):
 
 def available_personas():
     """[(key, label), ...] in menu order - London voices first."""
-    order = ["london", "london_warm", "london_bright", "michaela",
+    order = ["london", "london_warm", "london_bright", "lisboa", "michaela",
              "aria_cinema", "ava_rich", "aussie_f",
              "emma", "jenny", "ryan", "aussie_m", "us_f", "us_m"]
     return [(k, VOICES[k].label) for k in order if k in VOICES]
