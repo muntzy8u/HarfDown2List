@@ -127,6 +127,37 @@ voice at a time). Two things worth knowing:
   `PARTIAL_MODEL`/`FINAL_MODEL` for multilingual Whisper models if you
   ever want that too.
 
+### Using Raquel day to day
+
+1. **Pick her voice** — restart the app, right-click the pill and, in the
+   `VOICES` list, choose **Raquel - Lisboa (pt-PT, cinematic)** (the star
+   marks the current voice; the choice is remembered in `voice.json`).
+   Her translate switch sits right under her row.
+2. **Set the mode** — click **Raquel: translate to Português** to have her
+   translate, or **Raquel: read as written** to hear the original text in
+   her voice. A notification confirms each flip; the choice is
+   remembered in `translate.json`.
+3. **Read something** — highlight English text anywhere and choose
+   **Read selection aloud** (or **Read selection anyway** for an older
+   highlight). Raquel translates on the fly and speaks the Portuguese.
+
+What the terminal running `main.py` shows when she speaks a translation:
+
+    ── Raquel - Lisboa (pt-PT, cinematic) (o que ela vai dizer) ──
+    <the exact European Portuguese text she is reading>
+
+That block is printed flush with the audio, so you can read the
+Portuguese sentence **while she says it** — the block is the study text,
+her voice is the pronunciation. The usual log lines keep flowing around
+it (`speaking with edge (...)`, watchdog notes, and, if the LLM is
+unreachable, `translation to ... failed` after which she reads the
+original English instead).
+
+**Study-loop tip**: highlight a sentence, read it, follow the terminal
+block, then read the same selection again — same translation, same
+block, so you can listen and read along as many times as you like.
+Stop Speaking works mid-sentence for every voice, Raquel included.
+
 Tuning is audition-first — nothing is written until you keep it:
 
     venv/bin/python voice_preview.py --list
