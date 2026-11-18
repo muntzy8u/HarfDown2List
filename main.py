@@ -348,20 +348,12 @@ class App:
             pause_label = "Resume reading"
         else:
             pause_label = "Pause reading"
-        # The translation toggle: live label so the menu always says what
-        # the click will do. It only changes Raquel - the lisboa persona
-        # translates before she reads; every other voice reads as written.
-        if voice_out.get_translate_target():
-            read_lang_label = "Raquel: translate to Português"
-        else:
-            read_lang_label = "Raquel: read as written"
         items = [
             ("Read selection aloud", "speak_selection"),
             ("Read selection anyway", "speak_selection_anyway"),
             ("Speak last transcript", "speak_last"),
             (pause_label, "toggle_pause"),
             ("Stop speaking", "stop_speaking"),
-            (read_lang_label, "toggle_translate"),
             ("Paste last transcript", "paste_last"),
             ("History", "history"),
             ("Mic: default", "mic"),
@@ -375,6 +367,17 @@ class App:
         for key, label in voice_out.available_personas():
             mark = "* " if key == persona.key else "  "
             items.append((mark + label, "voice:" + key))
+        # Raquel's translation switch lives with her voice row: it drives
+        # her alone, so the menu keeps them side by side.
+        for i, (_, payload) in enumerate(items):
+            if payload == "voice:lisboa":
+                items.insert(
+                    i + 1,
+                    ("Raquel: translate to Português"
+                     if voice_out.get_translate_target() else
+                     "Raquel: read as written",
+                     "toggle_translate"))
+                break
         self.menu.open(
             bx + 6,
             by - len(items) * 26 - 12,

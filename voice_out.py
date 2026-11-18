@@ -304,6 +304,19 @@ class Utterance:
             except Exception:
                 pass
 
+    def _watchdog_arm(self):
+        """(Re)start the supervisor once a player exists.
+
+        An utterance is registered BEFORE synthesis now (so Stop Speaking
+        can cancel the translate/synth window); its first supervisor exits
+        immediately because there is nothing to watch yet. This re-arms it
+        the moment the player is bound.
+        """
+        if not self._thread.is_alive():
+            self._thread = threading.Thread(target=self._supervise,
+                                            daemon=True)
+            self._thread.start()
+
     def stop(self):
         """Kill the utterance now (Esc, or a newer utterance taking over)."""
         if self._stopped.is_set():
@@ -521,12 +534,17 @@ def _synth_edge(text, persona, tmpdir, clip):
         _edge_cli(persona, text, clip)
 
 
-def _speak_edge(text, persona):
-    """edge-tts -> temp clip -> ffplay."
+def _speak_edge(text, persona, utt=None):
+    """edge-tts -> temp clip -> ffplay.
 
     The clip is written to a private temp dir and deleted when playback
     finishes. The old code used NamedTemporaryFile(delete=False) and never
     removed it, so every read-back left an mp3 in /tmp forever.
+
+    When `utt` is given (pre-registered by speak()), it is checked right
+    after synthesis: a Stop Speaking that arrived during the translate/
+    synth window cancels the utterance BEFORE any audio is spawned. The
+    player is then bound to that same utterance and its watchdog armed.
     """
     exe = _edge_bin()
     tmpdir = tempfile.mkdtemp(prefix="hd2l-tts-")
@@ -539,14 +557,25 @@ def _speak_edge(text, persona):
     except Exception:
         cleanup()
         raise
+    if utt is not None and utt.stopped:
+        cleanup()
+        return utt
     if not shutil.which("ffplay"):
         raise RuntimeError("ffplay (ffmpeg) is not installed - required "
                            "to play audio")
     play = subprocess.Popen(
         ["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", clip],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    utt = Utterance([play], primary=play, cleanup=cleanup)
+    if utt is None:
+        fresh = Utterance([play], primary=play, cleanup=cleanup)
+        fresh.set_player(play)
+        return fresh
+    # bind the player into the pre-registered utterance and arm its watchdog
+    utt.procs.append(play)
+    utt.primary = play
+    utt._cleanup = cleanup
     utt.set_player(play)
+    utt._watchdog_arm()
     return utt
 
 
@@ -620,6 +649,16 @@ def speak(text, persona=None):
     p = persona_for(persona)
     stop()                      # never talk over the previous utterance
 
+    # Register the utterance BEFORE the slow parts (translation, synthesis).
+    # This is what makes Stop Speaking work for every voice: the old code
+    # only registered it once the audio player existed, so a Stop click
+    # during the translate/synth window did nothing and the speech started
+    # anyway.
+    utt = Utterance([], primary=None, cleanup=None)
+    global _current
+    with _current_lock:
+        _current = utt
+
     spoken_text = text
     # Translation belongs to Raquel, and only to Raquel: the lisboa
     # persona translates before she reads. Any OTHER persona simply reads
@@ -641,11 +680,10 @@ def speak(text, persona=None):
                           "original text", target)
 
     try:
-        utt = _speak_edge(spoken_text, p)
+        utt = _speak_edge(spoken_text, p, utt)
     except Exception as e:
         log.error("edge-tts read-back failed: %s", e)
         return None
-    global _current
     with _current_lock:
         _current = utt
     log.info("speaking with edge (%s)", p.label)
