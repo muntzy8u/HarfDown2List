@@ -54,9 +54,10 @@ some cloud models return reasoning text that would leak into pastes.
   so nothing can fall back to a different accent or a robotic voice.
   `TTS_MAX_SECONDS` is the watchdog that kills a runaway read-back. The
   per-persona `rate` / `pitch` live in `voice_out.py`, and
-  `TTS_TRANSLATE_TO` turns on live translation: read-backs are translated
-  to that language by the local ollama LLM and spoken with the matching
-  native persona.
+  `TTS_TRANSLATE_TO` gives the `lisboa` persona (Raquel) her job: she
+  translates English on the fly with the local ollama LLM and reads it in
+  European Portuguese. The menu toggle flips her only — every other
+  persona reads as written.
 
 ## Auditioning a voice
 

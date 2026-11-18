@@ -609,12 +609,11 @@ def speak(text, persona=None):
 
     Returns the Utterance that is playing, or None if nothing could speak.
     Any previous utterance is stopped first: two voices at once is never
-    what the user meant.
-
-    With config.TTS_TRANSLATE_TO set, the text is translated on the fly and
-    read in that language by the native matching persona (lisboa / Raquel
-    for European Portuguese). If the translation pass fails, the ORIGINAL
-    text is read - the read-back never falls silent for that reason.
+    what the user meant. The persona you select is the persona that speaks.
+    Only the lisboa persona (Raquel) translates: with her selected and
+    TTS_TRANSLATE_TO set, English text is translated on the fly and read in
+    European Portuguese. Every other persona reads the text exactly as
+    written.
     """
     if not text or not text.strip():
         return None
@@ -622,23 +621,24 @@ def speak(text, persona=None):
     stop()                      # never talk over the previous utterance
 
     spoken_text = text
-    target = get_translate_target()
-    if target:
-        translated = _translate(text, target)
-        if translated:
-            spoken_text = translated
-            if "lisboa" in VOICES and p.edge != "pt-PT-RaquelNeural":
-                log.info("translation to %s: reading with the lisboa "
-                         "persona (native pt-PT voice)", target)
-                p = VOICES["lisboa"]
-            # Learning aid: print exactly what she is about to say, so the
-            # Portuguese in this terminal matches the voice on the speakers.
-            print("", flush=True)
-            print("── %s (o que ela vai dizer) ──" % p.label, flush=True)
-            print(translated, flush=True)
-        else:
-            log.error("translation to %s failed; reading the original "
-                      "English text", target)
+    # Translation belongs to Raquel, and only to Raquel: the lisboa
+    # persona translates before she reads. Any OTHER persona simply reads
+    # the text exactly as written - the voice you select always wins.
+    if p.edge.startswith("pt-PT"):
+        target = get_translate_target()
+        if target:
+            translated = _translate(text, target)
+            if translated:
+                spoken_text = translated
+                # Learning aid: print exactly what she is about to say, so
+                # the Portuguese in this terminal matches her voice.
+                print("", flush=True)
+                print("── %s (o que ela vai dizer) ──" % p.label,
+                      flush=True)
+                print(translated, flush=True)
+            else:
+                log.error("translation to %s failed; Raquel reads the "
+                          "original text", target)
 
     try:
         utt = _speak_edge(spoken_text, p)

@@ -348,12 +348,13 @@ class App:
             pause_label = "Resume reading"
         else:
             pause_label = "Pause reading"
-        # The read-back language toggle: live label so the menu always
-        # says what the click will do.
+        # The translation toggle: live label so the menu always says what
+        # the click will do. It only changes Raquel - the lisboa persona
+        # translates before she reads; every other voice reads as written.
         if voice_out.get_translate_target():
-            read_lang_label = "Read language: Português (Raquel)"
+            read_lang_label = "Raquel: translate to Português"
         else:
-            read_lang_label = "Read language: as written (English)"
+            read_lang_label = "Raquel: read as written"
         items = [
             ("Read selection aloud", "speak_selection"),
             ("Read selection anyway", "speak_selection_anyway"),
@@ -436,8 +437,8 @@ class App:
             notify.notify("HarfDown2List", "Voice: %s" % persona.label)
             print(f"[app] voice -> {persona.key} ({persona.label})", flush=True)
             voice_out.speak_async(
-                "Good evening. This is your reading voice, speaking from "
-                "London.")
+                f"Good evening. I am {persona.label}, and this is how your "
+                "reading voice sounds.")
         elif payload == "toggle_pause":
             state = voice_out.toggle_pause()
             if state == "paused":
@@ -458,15 +459,16 @@ class App:
                 return
             if tgt:
                 notify.notify("HarfDown2List",
-                              "Read language: Português — English selections "
-                              "are translated on the fly and read by Raquel.")
-                print("[app] read language -> Português (Raquel, pt-PT)",
+                              "Raquel will translate selections to "
+                              "Português. Every other voice reads exactly "
+                              "as written.")
+                print("[app] raquel -> translate to Português",
                       flush=True)
             else:
                 notify.notify("HarfDown2List",
-                              "Read language: as written (English).")
-                print("[app] read language -> as written (English)",
-                      flush=True)
+                              "Raquel reads as written. All voices now "
+                              "read exactly what is given to them.")
+                print("[app] raquel -> read as written", flush=True)
         elif payload == "paste_last":
             if self.last_transcript:
                 paste.paste(self.last_transcript)
