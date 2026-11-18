@@ -122,7 +122,9 @@ voice at a time). Two things worth knowing:
   native lisboa voice. If the LLM is unreachable the original English is
   read instead; set it to `""` to switch the whole pass off. Dictation
   (STT) remains English-only — swap `PARTIAL_MODEL`/`FINAL_MODEL` for
-  multilingual Whisper models if you ever want that too.
+  multilingual Whisper models if you ever want that too. It is also a
+  right-click menu toggle (**“Read language: …”**) — flipped at runtime,
+  no config edits needed; the choice is remembered in `translate.json`.
 
 Tuning is audition-first — nothing is written until you keep it:
 

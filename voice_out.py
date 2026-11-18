@@ -125,6 +125,46 @@ def save_persona(key):
         return False
 
 
+TRANSLATE_STATE = os.path.join(
+    getattr(config, "STATE_DIR",
+            os.path.expanduser("~/.local/state/HarfDown2List")),
+    "translate.json")
+
+
+def get_translate_target():
+    """Effective read-back language: the menu choice (translate.json) wins,
+    else the config default (config.TTS_TRANSLATE_TO). Empty = read as
+    written, no translation."""
+    try:
+        with open(TRANSLATE_STATE, encoding="utf-8") as f:
+            v = json.load(f).get("translated_to")
+        if v is not None:
+            return v
+    except Exception:
+        pass
+    return getattr(config, "TTS_TRANSLATE_TO", "")
+
+
+def set_translate_target(value):
+    """Menu toggle: remember the read-back language (empty = English as
+    written). Returns the value on success, None if it could not save."""
+    try:
+        os.makedirs(os.path.dirname(TRANSLATE_STATE), exist_ok=True)
+        data = {}
+        try:
+            with open(TRANSLATE_STATE, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+        data["translated_to"] = value
+        with open(TRANSLATE_STATE, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        return value
+    except Exception as e:
+        log.warning("could not save the translate choice: %s", e)
+        return None
+
+
 def set_persona(key):
     """Switch the voice now and remember it. Returns the Persona or None."""
     global _persona_override
@@ -582,7 +622,7 @@ def speak(text, persona=None):
     stop()                      # never talk over the previous utterance
 
     spoken_text = text
-    target = getattr(config, "TTS_TRANSLATE_TO", "")
+    target = get_translate_target()
     if target:
         translated = _translate(text, target)
         if translated:

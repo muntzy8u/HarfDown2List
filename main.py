@@ -348,12 +348,19 @@ class App:
             pause_label = "Resume reading"
         else:
             pause_label = "Pause reading"
+        # The read-back language toggle: live label so the menu always
+        # says what the click will do.
+        if voice_out.get_translate_target():
+            read_lang_label = "Read language: Português (Raquel)"
+        else:
+            read_lang_label = "Read language: as written (English)"
         items = [
             ("Read selection aloud", "speak_selection"),
             ("Read selection anyway", "speak_selection_anyway"),
             ("Speak last transcript", "speak_last"),
             (pause_label, "toggle_pause"),
             ("Stop speaking", "stop_speaking"),
+            (read_lang_label, "toggle_translate"),
             ("Paste last transcript", "paste_last"),
             ("History", "history"),
             ("Mic: default", "mic"),
@@ -442,6 +449,24 @@ class App:
         elif payload == "stop_speaking":
             if voice_out.stop():
                 notify.notify("HarfDown2List", "Stopped.")
+        elif payload == "toggle_translate":
+            tgt = voice_out.set_translate_target(
+                "" if voice_out.get_translate_target() else
+                "European Portuguese (Portugal)")
+            if tgt is None:
+                notify.notify("HarfDown2List", "Could not save the toggle.")
+                return
+            if tgt:
+                notify.notify("HarfDown2List",
+                              "Read language: Português — English selections "
+                              "are translated on the fly and read by Raquel.")
+                print("[app] read language -> Português (Raquel, pt-PT)",
+                      flush=True)
+            else:
+                notify.notify("HarfDown2List",
+                              "Read language: as written (English).")
+                print("[app] read language -> as written (English)",
+                      flush=True)
         elif payload == "paste_last":
             if self.last_transcript:
                 paste.paste(self.last_transcript)
