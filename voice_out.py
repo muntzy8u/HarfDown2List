@@ -631,6 +631,11 @@ def speak(text, persona=None):
                 log.info("translation to %s: reading with the lisboa "
                          "persona (native pt-PT voice)", target)
                 p = VOICES["lisboa"]
+            # Learning aid: print exactly what she is about to say, so the
+            # Portuguese in this terminal matches the voice on the speakers.
+            print("", flush=True)
+            print("── %s (o que ela vai dizer) ──" % p.label, flush=True)
+            print(translated, flush=True)
         else:
             log.error("translation to %s failed; reading the original "
                       "English text", target)
